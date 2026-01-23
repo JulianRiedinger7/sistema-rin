@@ -40,7 +40,7 @@ export async function updateProfile(formData: FormData) {
     const validated = ProfileUpdateSchema.safeParse(rawData)
 
     if (!validated.success) {
-        const firstError = validated.error.errors[0]?.message
+        const firstError = validated.error.issues[0]?.message
         return { error: firstError || 'Datos inválidos.' }
     }
 

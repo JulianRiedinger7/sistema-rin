@@ -10,6 +10,11 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { getStudentLogs } from '../actions'
 
+interface CompletedRoutineViewerProps {
+    completion: any
+    children: React.ReactNode
+}
+
 export default function CompletedRoutineViewer({ completion, children }: CompletedRoutineViewerProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [items, setItems] = useState<any[]>([])

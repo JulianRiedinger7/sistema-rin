@@ -75,7 +75,7 @@ export default async function StudentDashboard() {
                         </p>
                     </div>
                     <QuotaStatus
-                        createdAt={profile.created_at}
+                        createdAt={profile?.created_at}
                         payments={payments || []}
                     />
                 </div>
@@ -103,7 +103,7 @@ export default async function StudentDashboard() {
                     </p>
                 </div>
                 <QuotaStatus
-                    createdAt={profile.created_at}
+                    createdAt={profile?.created_at}
                     payments={payments || []}
                 />
             </div>

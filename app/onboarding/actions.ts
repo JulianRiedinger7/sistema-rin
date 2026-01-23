@@ -44,8 +44,8 @@ const OnboardingSchema = z.object({
     relevantConditions: z.string().optional(),
 
     // Declaration
-    healthDeclaration: z.literal("on", {
-        errorMap: () => ({ message: "Debes aceptar la declaración jurada" }),
+    healthDeclaration: z.string().refine((val) => val === "on", {
+        message: "Debes aceptar la declaración jurada",
     }),
 })
 
@@ -106,7 +106,7 @@ export async function saveHealthProfile(formData: FormData) {
 
     if (!validatedFields.success) {
         console.error(validatedFields.error.flatten())
-        const errorMessages = validatedFields.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('. ')
+        const errorMessages = validatedFields.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join('. ')
         return { error: 'Faltan campos obligatorios: ' + errorMessages }
     }
 
