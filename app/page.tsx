@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Dumbbell, ArrowRight } from "lucide-react";
+import { Dumbbell, ArrowRight, Users } from "lucide-react";
 
 export default function Home() {
   return (
@@ -13,16 +13,11 @@ export default function Home() {
           </div>
           <span className="font-bold text-xl tracking-tight">R.I.N. GYM</span>
         </div>
-        <div className="flex items-center gap-4">
-          <Link href="/login" className="text-sm font-medium hover:text-primary transition-colors">
-            Iniciar Sesión
+        <Button asChild size="sm" className="bg-primary text-black hover:bg-primary/90 font-bold">
+          <Link href="/login">
+            Ingresar
           </Link>
-          <Button asChild size="sm" className="bg-primary text-black hover:bg-primary/90 font-bold">
-            <Link href="/signup">
-              Registrarse
-            </Link>
-          </Button>
-        </div>
+        </Button>
       </header>
 
       {/* Hero Section */}
@@ -39,20 +34,28 @@ export default function Home() {
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Plataforma de gestión integral para atletas de alto rendimiento y pilates.
-            Controla tus rutinas, progreso y reservas en un solo lugar.
+            Accede a tus rutinas personalizadas, seguí tu progreso y gestioná tus reservas.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <Button asChild size="lg" className="h-12 px-8 text-lg font-bold">
-              <Link href="/signup">
-                Empezar Ahora <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg" className="h-12 px-8 text-lg">
+          <div className="flex flex-col items-center justify-center gap-4 pt-4">
+            <Button asChild size="lg" className="h-14 px-10 text-lg font-bold">
               <Link href="/login">
-                Ya tengo cuenta
+                Ingresar al Sistema <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
+          </div>
+
+          {/* Info Card */}
+          <div className="mt-8 p-4 bg-muted/30 border border-white/10 rounded-lg max-w-md mx-auto">
+            <div className="flex items-center gap-3 text-left">
+              <Users className="h-8 w-8 text-primary shrink-0" />
+              <div>
+                <p className="text-sm font-medium">¿Sos nuevo?</p>
+                <p className="text-xs text-muted-foreground">
+                  Acercate al gimnasio para que el staff te registre en el sistema.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </main>

@@ -128,3 +128,128 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Enhanced Button Feedback */
+@layer components {
+
+  /* All buttons get pointer cursor and smooth transitions */
+  button,
+  [role="button"],
+  [data-slot="button"] {
+    @apply cursor-pointer;
+  }
+
+  /* Primary button enhanced feedback */
+  [data-slot="button"][data-variant="default"] {
+    @apply transition-all duration-150 ease-out;
+  }
+
+  [data-slot="button"][data-variant="default"]:hover {
+    @apply shadow-lg shadow-primary/30;
+    transform: translateY(-1px);
+  }
+
+  [data-slot="button"][data-variant="default"]:active {
+    @apply shadow-md;
+    transform: translateY(0) scale(0.98);
+  }
+
+  /* Destructive button feedback */
+  [data-slot="button"][data-variant="destructive"]:hover {
+    @apply shadow-lg shadow-destructive/30;
+    transform: translateY(-1px);
+  }
+
+  [data-slot="button"][data-variant="destructive"]:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  /* Outline button feedback */
+  [data-slot="button"][data-variant="outline"]:hover {
+    @apply border-primary/50;
+  }
+
+  [data-slot="button"][data-variant="outline"]:active {
+    transform: scale(0.98);
+  }
+
+  /* Ghost button feedback */
+  [data-slot="button"][data-variant="ghost"]:active {
+    transform: scale(0.97);
+  }
+
+  /* Cards that are clickable */
+  .cursor-pointer:hover {
+    @apply transition-all duration-150;
+  }
+
+  /* Interactive menu items */
+  [role="menuitem"],
+  [data-radix-collection-item] {
+    @apply cursor-pointer transition-colors duration-100;
+  }
+
+  [role="menuitem"]:active,
+  [data-radix-collection-item]:active {
+    @apply scale-[0.99];
+  }
+
+  /* Tabs trigger feedback */
+  [role="tab"] {
+    @apply cursor-pointer transition-all duration-150;
+  }
+
+  [role="tab"]:hover:not([data-state="active"]) {
+    @apply bg-muted/50;
+  }
+
+  [role="tab"]:active {
+    transform: scale(0.98);
+  }
+
+  /* Accordion trigger feedback */
+  [data-radix-accordion-trigger] {
+    @apply cursor-pointer transition-all duration-150;
+  }
+
+  [data-radix-accordion-trigger]:hover {
+    @apply bg-muted/30;
+  }
+
+  [data-radix-accordion-trigger]:active {
+    transform: scale(0.99);
+  }
+
+  /* Checkbox and Radio feedback */
+  [role="checkbox"],
+  [role="radio"] {
+    @apply cursor-pointer transition-transform duration-100;
+  }
+
+  [role="checkbox"]:active,
+  [role="radio"]:active {
+    transform: scale(0.9);
+  }
+
+  /* Select trigger feedback */
+  [data-radix-select-trigger] {
+    @apply cursor-pointer transition-all duration-150;
+  }
+
+  [data-radix-select-trigger]:hover {
+    @apply border-primary/50;
+  }
+
+  /* Dialog close button */
+  [data-radix-dialog-close] {
+    @apply cursor-pointer transition-all duration-100;
+  }
+
+  [data-radix-dialog-close]:hover {
+    @apply bg-muted;
+  }
+
+  [data-radix-dialog-close]:active {
+    transform: scale(0.9);
+  }
+}

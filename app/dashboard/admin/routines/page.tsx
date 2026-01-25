@@ -44,17 +44,19 @@ export default async function RoutinesPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <h1 className="text-3xl font-bold text-primary">Gestión de Rutinas</h1>
-                <Button asChild>
-                    <Link href="/dashboard/admin/routines/create">
-                        <Plus className="mr-2 h-4 w-4" /> Nueva Rutina
-                    </Link>
-                </Button>
+                <div className="self-start sm:self-auto">
+                    <Button asChild>
+                        <Link href="/dashboard/admin/routines/create">
+                            <Plus className="mr-2 h-4 w-4" /> Nueva Rutina
+                        </Link>
+                    </Button>
+                </div>
             </div>
 
-            <div className="rounded-md border border-border bg-card">
-                <Table>
+            <div className="rounded-md border border-border bg-card overflow-x-auto">
+                <Table className="min-w-[500px]">
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nombre</TableHead>

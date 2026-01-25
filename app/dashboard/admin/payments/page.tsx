@@ -57,20 +57,18 @@ export default async function PaymentsAdminPage({
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                    <h1 className="text-3xl font-bold text-primary">Control de Pagos</h1>
-                </div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <h1 className="text-3xl font-bold text-primary">Control de Pagos</h1>
 
-                <div className="flex items-center gap-2 w-full md:w-auto">
+                <div className="flex flex-wrap items-center gap-2">
                     <PaymentSearch />
                     <PriceConfigDialog prices={prices || []} />
                     <RegisterPaymentDialog students={students || []} pricedActivities={prices || []} />
                 </div>
             </div>
 
-            <div className="rounded-md border border-border bg-card">
-                <Table>
+            <div className="rounded-md border border-border bg-card overflow-x-auto">
+                <Table className="min-w-[600px]">
                     <TableHeader>
                         <TableRow>
                             <TableHead>Fecha</TableHead>
