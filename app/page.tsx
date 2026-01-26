@@ -1,18 +1,23 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Dumbbell, ArrowRight, Users } from "lucide-react";
+import Image from "next/image";
+import { ArrowRight, Users } from "lucide-react";
 
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       {/* Navbar */}
-      <header className="px-6 h-16 flex items-center justify-between border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 bg-primary rounded-md flex items-center justify-center">
-            <Dumbbell className="h-5 w-5 text-black" />
-          </div>
-          <span className="font-bold text-xl tracking-tight">R.I.N. GYM</span>
-        </div>
+      <header className="px-6 h-20 flex items-center justify-between border-b border-white/10">
+        <Link href="/" className="flex items-center">
+          <Image
+            src="/logo.png"
+            alt="R.I.N. Centro Integral de Salud Deportiva"
+            width={160}
+            height={58}
+            className="object-contain"
+            priority
+          />
+        </Link>
         <Button asChild size="sm" className="bg-primary text-black hover:bg-primary/90 font-bold">
           <Link href="/login">
             Ingresar

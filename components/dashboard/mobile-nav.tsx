@@ -2,6 +2,7 @@
 
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
+import Image from 'next/image'
 import { Menu } from 'lucide-react'
 import { Sidebar } from './sidebar'
 import { useState } from 'react'
@@ -22,10 +23,10 @@ export function MobileNav({ role }: MobileNavProps) {
     }, [pathname])
 
     return (
-        <div className="flex h-14 items-center border-b border-border bg-background px-4 md:hidden">
+        <div className="flex h-16 items-center border-b border-border bg-background px-4 md:hidden">
             <Sheet open={open} onOpenChange={setOpen}>
                 <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className="mr-2">
+                    <Button variant="ghost" size="icon" className="mr-3">
                         <Menu className="h-5 w-5" />
                         <span className="sr-only">Menu</span>
                     </Button>
@@ -40,7 +41,14 @@ export function MobileNav({ role }: MobileNavProps) {
                     </div>
                 </SheetContent>
             </Sheet>
-            <span className="font-bold text-primary">R.I.N. SYSTEM</span>
+            <Image
+                src="/logo.png"
+                alt="R.I.N."
+                width={130}
+                height={48}
+                className="object-contain"
+                priority
+            />
         </div>
     )
 }

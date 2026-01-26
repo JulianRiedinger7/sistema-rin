@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
@@ -51,12 +52,19 @@ export function Sidebar({ role, className }: SidebarProps & { className?: string
     }
 
     return (
-        <aside className={cn("h-screen w-64 flex-col border-r border-border bg-card text-card-foreground text-sm", className)}>
-            <div className="flex h-16 items-center border-b border-border px-6">
-                <span className="text-xl font-bold tracking-tighter text-primary">R.I.N. SYSTEM</span>
+        <aside className={cn("h-full w-64 flex flex-col border-r border-border bg-card text-card-foreground text-sm", className)}>
+            <div className="flex h-16 items-center border-b border-border px-4 shrink-0">
+                <Image
+                    src="/logo.png"
+                    alt="R.I.N. Centro Integral de Salud Deportiva"
+                    width={160}
+                    height={56}
+                    className="object-contain"
+                    priority
+                />
             </div>
-            <nav className="flex-1 overflow-y-auto py-4">
-                <ul className="space-y-1 px-3">
+            <nav className="flex-1 overflow-y-auto py-2 min-h-0">
+                <ul className="space-y-0.5 px-3">
                     {links.map((link) => {
                         const Icon = link.icon
                         const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`)
@@ -78,7 +86,7 @@ export function Sidebar({ role, className }: SidebarProps & { className?: string
                     })}
                 </ul>
             </nav>
-            <div className="border-t border-border p-4">
+            <div className="border-t border-border p-3 mt-auto">
                 <Button
                     variant="outline"
                     className="w-full justify-start gap-3 border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive"
