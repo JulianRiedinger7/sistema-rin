@@ -23,10 +23,10 @@ export function MobileNav({ role }: MobileNavProps) {
     }, [pathname])
 
     return (
-        <div className="flex h-16 items-center border-b border-border bg-background px-4 md:hidden">
+        <div className="flex h-14 items-center border-b border-border bg-background px-3 md:hidden">
             <Sheet open={open} onOpenChange={setOpen}>
                 <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className="mr-3">
+                    <Button variant="ghost" size="icon" className="mr-1.5 shrink-0">
                         <Menu className="h-5 w-5" />
                         <span className="sr-only">Menu</span>
                     </Button>
@@ -44,8 +44,8 @@ export function MobileNav({ role }: MobileNavProps) {
             <Image
                 src="/logo.png"
                 alt="R.I.N."
-                width={130}
-                height={48}
+                width={70}
+                height={24}
                 className="object-contain"
                 priority
             />

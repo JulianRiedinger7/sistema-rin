@@ -12,8 +12,8 @@ export default function Home() {
           <Image
             src="/logo.png"
             alt="R.I.N. Centro Integral de Salud Deportiva"
-            width={160}
-            height={58}
+            width={100}
+            height={36}
             className="object-contain"
             priority
           />

@@ -57,8 +57,8 @@ export function Sidebar({ role, className }: SidebarProps & { className?: string
                 <Image
                     src="/logo.png"
                     alt="R.I.N. Centro Integral de Salud Deportiva"
-                    width={160}
-                    height={56}
+                    width={100}
+                    height={35}
                     className="object-contain"
                     priority
                 />
