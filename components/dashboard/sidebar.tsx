@@ -12,7 +12,9 @@ import {
     LayoutDashboard,
     LogOut,
     BicepsFlexed,
-    TrendingUp
+
+    TrendingUp,
+    Shield
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/utils/supabase/client'
@@ -24,6 +26,7 @@ const adminLinks = [
     { href: '/dashboard/admin/exercises', label: 'Ejercicios', icon: Dumbbell },
     { href: '/dashboard/admin/routines', label: 'Rutinas', icon: BicepsFlexed },
     { href: '/dashboard/admin/tests', label: 'Testeos', icon: TrendingUp },
+    { href: '/dashboard/admin/teams', label: 'Equipos', icon: Shield },
     { href: '/dashboard/admin/pilates', label: 'Pilates', icon: CalendarDays },
     { href: '/dashboard/admin/payments', label: 'Pagos', icon: CreditCard },
 ]
