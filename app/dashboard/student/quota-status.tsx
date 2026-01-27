@@ -9,6 +9,8 @@ type Payment = {
     status: 'paid' | 'pending' | 'overdue'
 }
 
+import { differenceInCalendarDays, addDays } from "date-fns"
+
 export function QuotaStatus({ createdAt, payments }: { createdAt: string, payments: Payment[] }) {
     // Logic: Expiration = Max(CreatedAt, LastPaidDate) + 30 days
     const now = new Date()
@@ -27,11 +29,11 @@ export function QuotaStatus({ createdAt, payments }: { createdAt: string, paymen
         }
     }
 
-    const expirationDate = new Date(baseDate)
-    expirationDate.setDate(expirationDate.getDate() + 30)
+    // Use addDays to be safe with month boundaries and easier to read
+    const expirationDate = addDays(baseDate, 30)
 
-    const diffTime = expirationDate.getTime() - now.getTime()
-    const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    // Calculate difference in calendar days (ignores specific time, purely date based)
+    const daysRemaining = differenceInCalendarDays(expirationDate, now)
 
     const isExpired = daysRemaining < 0
     const hasPending = payments.some(p => p.status === 'pending')
