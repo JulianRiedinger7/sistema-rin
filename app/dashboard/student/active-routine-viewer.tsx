@@ -7,12 +7,23 @@ import { Badge } from '@/components/ui/badge'
 import { Play, Timer, CheckCircle2, ChevronRight, X, Video } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { createClient } from '@/utils/supabase/client'
-import { completeWorkoutDay, logSet, getLastExerciseLogs } from './actions'
+import { completeWorkoutDay, batchLogProgress, getLastExerciseLogs } from './actions'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 export default function ActiveRoutineViewer({ routine, day }: { routine: any, day: number }) {
     const [isOpen, setIsOpen] = useState(false)
@@ -20,6 +31,7 @@ export default function ActiveRoutineViewer({ routine, day }: { routine: any, da
     const [seconds, setSeconds] = useState(0)
     const [items, setItems] = useState<any[]>([])
     const [lastLogs, setLastLogs] = useState<Record<string, any>>({})
+    const [inputs, setInputs] = useState<Record<string, { weight: string, rpe: string, notes: string }>>({})
 
     // Unique key for this specific routine + day combination
     const STORAGE_KEY = `workout_timer_${routine.id}_${day}`
@@ -96,11 +108,46 @@ export default function ActiveRoutineViewer({ routine, day }: { routine: any, da
         setIsStarted(true)
     }
 
+
     const handleFinish = async () => {
-        if (!confirm('¿Estás seguro de que deseas finalizar la rutina? Se guardará el tiempo transcurrido.')) return
+        // Confirmation handled by UI
+        // if (!confirm('¿Estás seguro de que deseas finalizar la rutina? Se guardará el tiempo transcurrido y las cargas ingresadas.')) return
 
         setIsStarted(false)
         localStorage.removeItem(STORAGE_KEY) // Clear timer
+
+        // 1. Collect Valid Inputs
+        const logsToSave = []
+        for (const itemId in inputs) {
+            const input = inputs[itemId]
+            if (input.weight || input.rpe || input.notes) {
+                const item = items.find(i => i.id === itemId)
+                if (item) {
+                    logsToSave.push({
+                        exerciseId: item.exercises.id,
+                        workoutItemId: itemId,
+                        weight: Number(input.weight) || 0,
+                        rpe: Number(input.rpe) || 0,
+                        notes: input.notes || ''
+                    })
+                }
+            }
+        }
+
+        // 2. Batch Save
+        console.log('Sending logs to save:', logsToSave)
+        if (logsToSave.length > 0) {
+            const batchRes = await batchLogProgress(logsToSave)
+            if (batchRes?.error) {
+                toast.error(batchRes.error)
+                return
+            }
+            if (batchRes?.success) {
+                toast.success(`Se guardaron ${logsToSave.length} registros de peso/RPE.`)
+            }
+        } else {
+            toast.info("No se detectaron cargas para guardar.")
+        }
 
         const res = await completeWorkoutDay(routine.id, day, seconds)
         if (res.error) {
@@ -109,6 +156,16 @@ export default function ActiveRoutineViewer({ routine, day }: { routine: any, da
             toast.success('¡Rutina finalizada!')
             setIsOpen(false)
         }
+    }
+
+    const handleInputChange = (itemId: string, field: 'weight' | 'rpe' | 'notes', value: string) => {
+        setInputs(prev => ({
+            ...prev,
+            [itemId]: {
+                ...prev[itemId] || { weight: '', rpe: '', notes: '' },
+                [field]: value
+            }
+        }))
     }
 
     return (
@@ -153,9 +210,28 @@ export default function ActiveRoutineViewer({ routine, day }: { routine: any, da
                             <div className="font-mono text-xl md:text-3xl font-bold tabular-nums text-primary animate-pulse">
                                 {formatTime(seconds)}
                             </div>
-                            <Button variant="destructive" onClick={handleFinish}>
-                                Finalizar
-                            </Button>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive">
+                                        Finalizar
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>¿Finalizar Rutina?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            Se guardará el tiempo transcurrido ({formatTime(seconds)}) y todas las cargas/notas ingresadas.
+                                            Esta acción no se puede deshacer.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleFinish} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                            Confirmar y Finalizar
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         </div>
                     ) : (
                         <Button className="bg-green-600 hover:bg-green-700 text-white px-8" onClick={handleStart}>
@@ -183,19 +259,14 @@ export default function ActiveRoutineViewer({ routine, day }: { routine: any, da
                                     item={item}
                                     isStarted={isStarted}
                                     lastLog={lastLogs[item.exercises.id]}
+                                    inputs={inputs[item.id] || { weight: '', rpe: '', notes: '' }}
+                                    onInputChange={(field, val) => handleInputChange(item.id, field, val)}
                                 />
                             ))
                         )}
 
                         <div className="h-20" />
 
-                        {/* DEBUG SECTION - REMOVE AFTER FIX */}
-                        <div className="mt-8 p-4 bg-black/80 text-green-400 font-mono text-xs rounded overflow-auto max-h-40">
-                            <p className="font-bold mb-2">DEBUG INFO:</p>
-                            <pre>{JSON.stringify(lastLogs, null, 2)}</pre>
-                            <p className="mt-2">Items Count: {items.length}</p>
-                            <p>Exercise IDs: {items.map(i => i.exercises?.id).join(', ')}</p>
-                        </div>
                     </div>
                 </ScrollArea>
             </DialogContent>
@@ -207,36 +278,15 @@ interface RoutineItemCardProps {
     item: any
     isStarted: boolean
     lastLog?: any
+    inputs: { weight: string, rpe: string, notes: string }
+    onInputChange: (field: 'weight' | 'rpe' | 'notes', value: string) => void
 }
 
-function RoutineItemCard({ item, isStarted, lastLog }: RoutineItemCardProps) {
-    const [weight, setWeight] = useState('')
-    const [rpe, setRpe] = useState('')
-    const [notes, setNotes] = useState('')
-    const [isLogged, setIsLogged] = useState(false)
-
-    const handleLog = async () => {
-        if (!weight && !rpe && !notes) return
-
-        const formData = new FormData()
-        formData.append('exerciseId', item.exercises.id)
-        formData.append('workoutItemId', item.id)
-        formData.append('weight', weight)
-        formData.append('rpe', rpe)
-        formData.append('notes', notes)
-
-        const res = await logSet(formData)
-        if (res.error) {
-            toast.error('Error al guardar registro')
-        } else {
-            toast.success('Registro guardado')
-            setIsLogged(true)
-        }
-    }
+function RoutineItemCard({ item, isStarted, lastLog, inputs, onInputChange }: RoutineItemCardProps) {
 
     return (
         <Card className={cn("border-l-4 transition-all",
-            isLogged ? "border-green-500 bg-green-50/50" : (
+            (
                 item.block_type === 'Fuerza' ? 'border-l-blue-500' :
                     item.block_type === 'Aerobico' ? 'border-l-green-500' : 'border-l-yellow-500'
             )
@@ -276,56 +326,41 @@ function RoutineItemCard({ item, isStarted, lastLog }: RoutineItemCardProps) {
 
                 {lastLog && (
                     <div className="mb-4 text-xs text-muted-foreground border-l-2 p-2 bg-muted/30">
-                        <span className="font-semibold text-primary">Último registro:</span> {lastLog.weight_used}kg (RPE {lastLog.rpe_actual})
-                        {lastLog.notes && <div className="italic">"{lastLog.notes}"</div>}
+                        <span className="font-semibold text-primary">Última vez:</span> {lastLog.weight_used}kg (RPE {lastLog.rpe_actual})
                     </div>
                 )}
 
-                {isStarted ? (
+                {isStarted && (
                     <div className="grid grid-cols-12 gap-2 items-end">
                         <div className="col-span-4 md:col-span-3">
                             <Label className="text-xs text-muted-foreground">Peso (kg)</Label>
                             <Input
                                 type="number"
                                 placeholder="0"
-                                value={weight}
-                                onChange={e => setWeight(e.target.value)}
+                                value={inputs.weight}
+                                onChange={e => onInputChange('weight', e.target.value)}
                                 className="h-8"
                             />
                         </div>
                         <div className="col-span-4 md:col-span-3">
-                            <Label className="text-xs text-muted-foreground">RPE Real</Label>
+                            <Label className="text-xs text-muted-foreground">RPE</Label>
                             <Input
                                 type="number"
-                                placeholder="1-10"
-                                value={rpe}
-                                onChange={e => setRpe(e.target.value)}
+                                placeholder="-"
+                                value={inputs.rpe}
+                                onChange={e => onInputChange('rpe', e.target.value)}
                                 className="h-8"
                             />
                         </div>
-                        <div className="col-span-12 md:col-span-6 flex gap-2">
-                            <div className="flex-1">
-                                <Label className="text-xs text-muted-foreground">Notas</Label>
-                                <Input
-                                    placeholder="Obs..."
-                                    value={notes}
-                                    onChange={e => setNotes(e.target.value)}
-                                    className="h-8"
-                                />
-                            </div>
-                            <Button
-                                size="sm"
-                                className={cn("mt-auto self-end", isLogged ? "bg-green-600 hover:bg-green-700" : "")}
-                                onClick={handleLog}
-                                disabled={isLogged}
-                            >
-                                {isLogged ? <CheckCircle2 className="h-4 w-4" /> : "Guardar"}
-                            </Button>
+                        <div className="col-span-12 md:col-span-6">
+                            <Label className="text-xs text-muted-foreground">Notas</Label>
+                            <Input
+                                placeholder="Obs..."
+                                value={inputs.notes}
+                                onChange={e => onInputChange('notes', e.target.value)}
+                                className="h-8"
+                            />
                         </div>
-                    </div>
-                ) : (
-                    <div className="text-sm text-muted-foreground text-center bg-muted/50 p-2 rounded">
-                        Inicia la rutina para registrar actividad
                     </div>
                 )}
             </CardContent>

@@ -5,6 +5,37 @@ import { revalidatePath } from 'next/cache'
 
 // ... imports
 import { createAdminClient } from '@/utils/supabase/admin'
+export async function batchLogProgress(logs: { exerciseId: string, workoutItemId: string, weight: number, rpe: number, notes: string }[]) {
+    const supabase = await createClient()
+    const adminSupabase = createAdminClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    if (logs.length === 0) return { success: true }
+
+    console.log('Server received batch logs:', JSON.stringify(logs, null, 2))
+
+    const records = logs.map(log => ({
+        user_id: user.id,
+        exercise_id: log.exerciseId,
+        workout_item_id: log.workoutItemId,
+        weight_used: log.weight,
+        rpe_actual: log.rpe,
+        notes: log.notes
+    }))
+
+    const { error, data } = await adminSupabase.from('progress_logs').insert(records).select()
+
+    if (error) {
+        console.error('Batch log error:', error)
+        return { error: `Error al guardar registros: ${error.message}` }
+    }
+    console.log('Batch log success. Inserted:', data)
+
+    revalidatePath('/dashboard/student')
+    return { success: true }
+}
 
 export async function logSet(formData: FormData) {
     const supabase = await createClient()
@@ -79,7 +110,7 @@ export async function getLastExerciseLogs(exerciseIds: string[]) {
         .select('*')
         .in('exercise_id', exerciseIds)
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+        .order('logged_at', { ascending: false })
         .limit(100)
 
     if (!data) return []
@@ -119,9 +150,11 @@ export async function getStudentLogs(userId: string, startTime: string, endTime:
         .from('progress_logs')
         .select('*')
         .eq('user_id', userId)
-        .gte('created_at', startTime)
-        .lte('created_at', endTime)
-        .order('created_at', { ascending: false })
+        .gte('logged_at', startTime)
+        .lte('logged_at', endTime)
+        .order('logged_at', { ascending: false })
 
     return data || []
 }
+
+

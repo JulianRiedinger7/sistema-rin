@@ -1,12 +1,9 @@
-import { getBenchmarks, getFinishedRoutines } from './actions'
+import { getBenchmarks } from './actions'
 import { AddBenchmarkDialog } from './add-benchmark-dialog'
 import { ClientProgressCharts } from './client-progress-charts'
-import { FinishedRoutinesList } from './finished-routines'
 
 export default async function ProgressPage() {
     const logs = await getBenchmarks()
-    const finishedRoutines = await getFinishedRoutines()
-
     return (
         <div className="space-y-6 pb-10">
             <div className="flex items-center justify-between">
@@ -18,8 +15,6 @@ export default async function ProgressPage() {
             </div>
 
             <ClientProgressCharts logs={logs} />
-
-            <FinishedRoutinesList completions={finishedRoutines} />
         </div>
     )
 }
