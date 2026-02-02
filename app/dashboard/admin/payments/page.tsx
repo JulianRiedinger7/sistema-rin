@@ -61,6 +61,12 @@ export default async function PaymentsAdminPage({
                 <h1 className="text-3xl font-bold text-primary">Control de Pagos</h1>
 
                 <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="outline" asChild>
+                        <a href="/dashboard/admin/expenses">
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Análisis de Gastos
+                        </a>
+                    </Button>
                     <PaymentSearch />
                     <PriceConfigDialog prices={prices || []} />
                     <RegisterPaymentDialog students={students || []} pricedActivities={prices || []} />
