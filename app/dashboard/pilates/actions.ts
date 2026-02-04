@@ -10,6 +10,7 @@ const BookingSchema = z.object({
 })
 
 import { Booking, PilatesConfig } from './types'
+import { differenceInMinutes } from 'date-fns'
 
 export async function getPilatesConfig() {
     const supabase = await createClient()
@@ -102,6 +103,15 @@ export async function bookSlot(date: Date, hour: number) {
         return { error: 'Turno lleno' }
     }
 
+    // Check if slot is in the past
+    const classIsoString = `${dateStr}T${hour.toString().padStart(2, '0')}:00:00.000-03:00`
+    const classDate = new Date(classIsoString)
+    const now = new Date()
+
+    if (classDate < now) {
+        return { error: 'No se pueden reservar turnos pasados' }
+    }
+
     // Use adminClient to INSERT (bypassing the revoked "Users can book" RLS)
     const { error } = await adminClient
         .from('pilates_bookings')
@@ -128,6 +138,22 @@ export async function cancelBooking(date: Date, hour: number) {
 
     const adminClient = createAdminClient() // For DB operations
     const dateStr = date.toISOString().split('T')[0]
+
+    // Check strict 2 hour cancellation policy
+    // Construct class time assuming Gym is in Argentina (UTC-3)
+    // We use the dateStr (YYYY-MM-DD) and the hour to create a specific point in time
+    const classIsoString = `${dateStr}T${hour.toString().padStart(2, '0')}:00:00.000-03:00`
+    const classDate = new Date(classIsoString)
+    const now = new Date()
+
+    // Check if class is in the past or within 2 hours (120 minutes)
+    const minutesUntilClass = differenceInMinutes(classDate, now)
+
+    // Allow cancelling if it's more than 2 hours away.
+    // Restrict if it's less than 120 minutes away.
+    if (minutesUntilClass <= 120) {
+        return { error: 'No es posible cancelar con menos de 2 horas de anticipación. Por favor comunícate con administración.' }
+    }
 
     const { error } = await adminClient
         .from('pilates_bookings')

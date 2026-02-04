@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, Fragment } from 'react'
-import { startOfWeek, addDays, format, isSameDay } from 'date-fns'
+import { startOfWeek, addDays, format, isSameDay, differenceInMinutes, isSaturday, isSunday, addWeeks } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -32,7 +32,18 @@ interface SchedulerProps {
 }
 
 export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onBookingChange }: SchedulerProps) {
-    const [currentDate, setCurrentDate] = useState(new Date())
+    const [currentDate, setCurrentDate] = useState(() => {
+        const now = new Date()
+        if (isSaturday(now) || isSunday(now)) {
+            return addDays(now, isSaturday(now) ? 2 : 1) // Jump to next Monday roughly, or just let startOfWeek handle it?
+            // Actually, simply adding 1 week is safer if we just want "Next Week's" scope.
+            // But startOfWeek is used later. 
+            // If today is Sat, startOfWeek is last Mon.
+            // If we want Next Mon, we need a date in next week.
+            return addWeeks(now, 1)
+        }
+        return now
+    })
     const [loading, setLoading] = useState<string | null>(null) // 'date-hour'
     const router = useRouter()
 
@@ -85,6 +96,19 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
 
         try {
             if (isBooked) {
+                // Cancel Check
+                const dateStr = format(date, 'yyyy-MM-dd')
+                const classIsoString = `${dateStr}T${hour.toString().padStart(2, '0')}:00:00.000-03:00`
+                const classDate = new Date(classIsoString)
+                const now = new Date()
+                const minutesUntilClass = differenceInMinutes(classDate, now)
+
+                if (minutesUntilClass <= 120) {
+                    toast.error('No puedes cancelar con menos de 2 horas de anticipación.')
+                    setLoading(null)
+                    return
+                }
+
                 // Cancel
                 const res = await cancelBooking(date, hour)
                 if (res.error) toast.error(res.error)
@@ -187,11 +211,30 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
                                     const isFull = count >= 4
                                     const isLoading = loading === `${dateStr}-${hour}`
 
+                                    // Check cancellation capability for UI
+                                    const classIsoString = `${dateStr}T${hour.toString().padStart(2, '0')}:00:00.000-03:00`
+                                    const classDate = new Date(classIsoString)
+                                    const now = new Date()
+                                    const minutesUntilClass = differenceInMinutes(classDate, now)
+
+                                    const isPast = minutesUntilClass < 0
+                                    const canCancel = minutesUntilClass > 120
+
                                     let stateClass = "border-border bg-card text-card-foreground hover:border-primary/50" // Default Available
                                     if (isBooked) stateClass = "border-blue-500/50 bg-blue-50/50 dark:bg-blue-900/10 text-blue-700 dark:text-blue-300" // My Booking
                                     else if (isFull) stateClass = "border-transparent bg-muted/50 text-muted-foreground opacity-70 cursor-not-allowed" // Full
 
-                                    if (isAdmin) stateClass = "border-border bg-card text-card-foreground hover:border-blue-500 hover:shadow-md cursor-pointer"
+                                    if (isPast) {
+                                        stateClass = "border-transparent bg-muted/20 text-muted-foreground opacity-50 cursor-not-allowed" // Past Slot
+                                        if (isBooked) stateClass = "border-blue-200 bg-blue-50/20 text-blue-400 opacity-60" // Past Booking
+                                    }
+
+                                    if (isAdmin) {
+                                        stateClass = "border-border bg-card text-card-foreground hover:border-blue-500 hover:shadow-md cursor-pointer"
+                                        if (count > 0) {
+                                            stateClass = "border-indigo-400 bg-indigo-50/30 dark:bg-indigo-900/20 text-card-foreground shadow-sm hover:border-indigo-600 hover:shadow-md cursor-pointer"
+                                        }
+                                    }
 
                                     return (
                                         <div
@@ -199,13 +242,21 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
                                             className={cn(
                                                 "relative p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer flex flex-col justify-between h-24 group",
                                                 stateClass,
-                                                isLoading && "opacity-50 pointer-events-none"
+                                                isLoading && "opacity-50 pointer-events-none",
+                                                !canCancel && isBooked && !isAdmin && !isPast && "opacity-80" // Slightly dim if locked
                                             )}
-                                            onClick={() => handleSlotClick(day, hour, count, isBooked, slotBookings)}
+                                            onClick={() => {
+                                                if (isPast && !isAdmin) return
+                                                handleSlotClick(day, hour, count, isBooked, slotBookings)
+                                            }}
                                         >
                                             <div className="flex justify-between items-start">
                                                 <span className="font-bold text-lg">{hour}:00</span>
-                                                {isBooked && !isAdmin && <div className="bg-blue-500 text-white rounded-full p-0.5"><Check className="w-3 h-3" /></div>}
+                                                {isBooked && !isAdmin && (
+                                                    canCancel
+                                                        ? <div className="bg-blue-500 text-white rounded-full p-0.5"><Check className="w-3 h-3" /></div>
+                                                        : <div className="bg-red-500 text-white rounded-full p-0.5" title="No se puede cancelar"><Lock className="w-3 h-3" /></div>
+                                                )}
                                                 {isFull && !isBooked && !isAdmin && <Badge variant="secondary" className="text-[10px] h-4 px-1">LLENO</Badge>}
                                                 {isAdmin && count >= 4 && <Badge variant="destructive" className="text-[10px] h-4 px-1">LLENO</Badge>}
                                             </div>
