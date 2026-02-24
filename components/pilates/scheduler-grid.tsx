@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input'
 import { useDebounce } from 'use-debounce'
 
+const MAX_CAPACITY = 5
+
 interface SchedulerProps {
     config: {
         morning_start: number
@@ -89,7 +91,7 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
             return
         }
 
-        if (capacity >= 4 && !isBooked) return // Full
+        if (capacity >= MAX_CAPACITY && !isBooked) return // Full
 
         const slotId = `${format(date, 'yyyy-MM-dd')}-${hour}`
         setLoading(slotId)
@@ -208,7 +210,7 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
                                     const slotBookings = initialBookings.filter(b => b.date === dateStr && b.hour === hour)
                                     const count = slotBookings.length
                                     const isBooked = slotBookings.some(b => b.user_id === userId)
-                                    const isFull = count >= 4
+                                    const isFull = count >= MAX_CAPACITY
                                     const isLoading = loading === `${dateStr}-${hour}`
 
                                     // Check cancellation capability for UI
@@ -258,13 +260,13 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
                                                         : <div className="bg-red-500 text-white rounded-full p-0.5" title="No se puede cancelar"><Lock className="w-3 h-3" /></div>
                                                 )}
                                                 {isFull && !isBooked && !isAdmin && <Badge variant="secondary" className="text-[10px] h-4 px-1">LLENO</Badge>}
-                                                {isAdmin && count >= 4 && <Badge variant="destructive" className="text-[10px] h-4 px-1">LLENO</Badge>}
+                                                {isAdmin && count >= MAX_CAPACITY && <Badge variant="destructive" className="text-[10px] h-4 px-1">LLENO</Badge>}
                                             </div>
 
                                             <div className="space-y-2">
                                                 {/* Circles Indicator */}
                                                 <div className="flex gap-1">
-                                                    {[...Array(4)].map((_, i) => (
+                                                    {[...Array(MAX_CAPACITY)].map((_, i) => (
                                                         <div
                                                             key={i}
                                                             className={cn(
@@ -279,9 +281,9 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
 
                                                 <div className="flex justify-between items-center text-xs font-medium">
                                                     <span className={isBooked ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}>
-                                                        {isAdmin ? `${count}/4` : (isBooked ? 'Tu Turno' : (isFull ? 'Completo' : 'Disponible'))}
+                                                        {isAdmin ? `${count}/${MAX_CAPACITY}` : (isBooked ? 'Tu Turno' : (isFull ? 'Completo' : 'Disponible'))}
                                                     </span>
-                                                    {!isAdmin && <span className="opacity-70">{count}/4</span>}
+                                                    {!isAdmin && <span className="opacity-70">{count}/{MAX_CAPACITY}</span>}
                                                 </div>
                                             </div>
                                         </div>
@@ -306,7 +308,7 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
                     <div className="space-y-6">
                         {/* Enrolled Students */}
                         <div className="space-y-2">
-                            <h4 className="text-sm font-medium text-muted-foreground">Alumnos Inscriptos ({selectedSlot?.bookings.length}/4)</h4>
+                            <h4 className="text-sm font-medium text-muted-foreground">Alumnos Inscriptos ({selectedSlot?.bookings.length}/{MAX_CAPACITY})</h4>
                             <div className="space-y-2">
                                 {selectedSlot?.bookings.length === 0 && <p className="text-sm text-muted-foreground italic">No hay alumnos inscriptos.</p>}
                                 {selectedSlot?.bookings.map(b => (
@@ -357,7 +359,7 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
                                                     size="sm"
                                                     variant="secondary"
                                                     className="h-7 text-xs"
-                                                    disabled={isAlready || (selectedSlot?.bookings.length || 0) >= 4}
+                                                    disabled={isAlready || (selectedSlot?.bookings.length || 0) >= MAX_CAPACITY}
                                                     onClick={() => handleAdminAdd(user.id)}
                                                 >
                                                     {isAlready ? 'Inscripto' : 'Agregar'}

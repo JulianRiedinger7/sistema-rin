@@ -12,7 +12,7 @@ interface Booking {
     hour: number
 }
 
-const MAX_CAPACITY = 4
+const MAX_CAPACITY = 5
 
 function getSlotCount(bookings: Booking[], date: string, hour: number): number {
     return bookings.filter(b => b.date === date && b.hour === hour).length

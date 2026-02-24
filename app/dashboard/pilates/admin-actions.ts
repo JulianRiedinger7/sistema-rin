@@ -34,7 +34,7 @@ export async function adminBookSlot(date: Date, hour: number, targetUserId: stri
 
     if (countError) return { error: 'Error verificando cupo' }
 
-    if ((count || 0) >= 4) {
+    if ((count || 0) >= 5) {
         return { error: 'Turno lleno' }
     }
 

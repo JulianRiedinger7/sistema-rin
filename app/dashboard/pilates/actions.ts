@@ -99,7 +99,7 @@ export async function bookSlot(date: Date, hour: number) {
 
     if (countError) return { error: 'Error verificando cupo' }
 
-    if ((count || 0) >= 4) {
+    if ((count || 0) >= 5) {
         return { error: 'Turno lleno' }
     }
 
