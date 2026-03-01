@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Play, Timer, CheckCircle2, ChevronRight, X, Video } from 'lucide-react'
+import { Play, Timer, CheckCircle2, ChevronRight, X, Video, FileText } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { createClient } from '@/utils/supabase/client'
 import { completeWorkoutDay, batchLogProgress, getLastExerciseLogs } from './actions'
@@ -239,6 +239,27 @@ export default function ActiveRoutineViewer({ routine, day }: { routine: any, da
                         </Button>
                     )}
                 </DialogHeader>
+
+                {/* PDF Banner */}
+                {routine.pdf_url && (
+                    <div className="px-6 py-3 border-b shrink-0">
+                        <a
+                            href={routine.pdf_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors group"
+                        >
+                            <div className="p-2 bg-red-500/20 rounded-lg group-hover:bg-red-500/30 transition-colors">
+                                <FileText className="h-5 w-5 text-red-500" />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-sm font-medium">PDF de Rutina disponible</p>
+                                <p className="text-xs text-muted-foreground">Toca para abrir el documento</p>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </a>
+                    </div>
+                )}
 
                 <ScrollArea className="flex-1 p-6">
                     <div className="space-y-8 max-w-3xl mx-auto">

@@ -9,13 +9,14 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Eye, ExternalLink, PlayCircle, CheckCircle2 } from "lucide-react"
+import { Eye, ExternalLink, PlayCircle, CheckCircle2, FileText } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
 interface RoutineDetails {
     id: string
     name: string
     notes?: string
+    pdf_url?: string
     activity_type: string
     items: {
         id: string
@@ -61,6 +62,23 @@ export function ViewRoutineDialog({ routine }: { routine: RoutineDetails }) {
 
                 <div className="flex-1 pr-4 mt-4 overflow-y-auto">
                     <div className="space-y-4">
+                        {/* PDF Link */}
+                        {routine.pdf_url && (
+                            <a
+                                href={routine.pdf_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors"
+                            >
+                                <FileText className="h-5 w-5 text-red-500" />
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium">PDF Adjunto</p>
+                                    <p className="text-xs text-muted-foreground">Click para abrir</p>
+                                </div>
+                                <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                            </a>
+                        )}
+
                         {routine.items.map((item, idx) => (
                             <div key={item.id} className="p-4 rounded-lg border border-border bg-card">
                                 <div className="flex items-start justify-between">

@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -21,7 +22,50 @@ interface CreateRoutineData {
     notes?: string
     global_structure?: string
     global_rpe?: string
+    pdf_url?: string
     items: RoutineItem[]
+}
+
+export async function uploadRoutinePdf(formData: FormData) {
+    const supabase = createAdminClient()
+
+    const file = formData.get('file') as File
+    if (!file || file.size === 0) {
+        return { error: 'No se seleccionó ningún archivo' }
+    }
+
+    // Validate file type
+    if (file.type !== 'application/pdf') {
+        return { error: 'Solo se permiten archivos PDF' }
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+        return { error: 'El archivo no puede superar los 10MB' }
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now()
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+    const filePath = `${timestamp}_${safeName}`
+
+    const { data, error } = await supabase.storage
+        .from('routine-pdfs')
+        .upload(filePath, file, {
+            contentType: 'application/pdf',
+            upsert: false,
+        })
+
+    if (error) {
+        return { error: 'Error al subir el PDF: ' + error.message }
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+        .from('routine-pdfs')
+        .getPublicUrl(data.path)
+
+    return { success: true, url: publicUrl }
 }
 
 export async function createRoutine(data: CreateRoutineData) {
@@ -36,6 +80,7 @@ export async function createRoutine(data: CreateRoutineData) {
             notes: data.notes,
             global_structure: data.global_structure,
             global_rpe: data.global_rpe,
+            pdf_url: data.pdf_url || null,
             assigned_by: (await supabase.auth.getUser()).data.user?.id,
         })
         .select()
@@ -89,8 +134,35 @@ export async function toggleRoutineActive(id: string, isActive: boolean) {
 
 export async function deleteRoutine(id: string) {
     const supabase = await createClient()
-    // ...
 
+    // 1. Fetch the routine to get the pdf_url before deleting
+    const { data: routine } = await supabase
+        .from('workouts')
+        .select('pdf_url')
+        .eq('id', id)
+        .single()
+
+    // 2. If there's a PDF, delete it from Storage
+    if (routine?.pdf_url) {
+        try {
+            // Extract the file path from the public URL
+            // URL format: .../storage/v1/object/public/routine-pdfs/FILENAME
+            const url = new URL(routine.pdf_url)
+            const pathParts = url.pathname.split('/routine-pdfs/')
+            if (pathParts[1]) {
+                const filePath = decodeURIComponent(pathParts[1])
+                const adminSupabase = createAdminClient()
+                await adminSupabase.storage
+                    .from('routine-pdfs')
+                    .remove([filePath])
+            }
+        } catch (e) {
+            // If PDF deletion fails, we still want to delete the routine
+            console.error('Error al eliminar PDF del storage:', e)
+        }
+    }
+
+    // 3. Delete the routine from the database
     const { error } = await supabase.from('workouts').delete().eq('id', id)
 
     if (error) {

@@ -26,9 +26,9 @@ import {
     DialogContent,
     DialogTitle,
 } from '@/components/ui/dialog'
-import { Check, ChevronsUpDown, Trash2, Plus, GripVertical } from 'lucide-react'
+import { Check, ChevronsUpDown, Trash2, Plus, GripVertical, FileUp, FileText, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { createRoutine } from './actions'
+import { createRoutine, uploadRoutinePdf } from './actions'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
@@ -60,6 +60,9 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
     const [globalStructure, setGlobalStructure] = useState('')
     const [globalRpe, setGlobalRpe] = useState('')
     const [notes, setNotes] = useState('')
+    const [pdfFile, setPdfFile] = useState<File | null>(null)
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+    const [uploadingPdf, setUploadingPdf] = useState(false)
 
     // 5-Day Structure State
     const [activeDay, setActiveDay] = useState(1) // 1-5
@@ -168,6 +171,28 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
             .filter(item => item.day_number === day && item.block_type === block)
     }
 
+    const handlePdfSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        if (file.type !== 'application/pdf') {
+            alert('Solo se permiten archivos PDF')
+            return
+        }
+
+        if (file.size > 10 * 1024 * 1024) {
+            alert('El archivo no puede superar los 10MB')
+            return
+        }
+
+        setPdfFile(file)
+    }
+
+    const handleRemovePdf = () => {
+        setPdfFile(null)
+        setPdfUrl(null)
+    }
+
     const handleSubmit = async () => {
         if (!activityType || !name) {
             alert("Por favor completa el nombre y selecciona una actividad.")
@@ -180,12 +205,31 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
         }
 
         setLoading(true)
+
+        // Upload PDF if selected
+        let finalPdfUrl: string | undefined = undefined
+        if (pdfFile) {
+            setUploadingPdf(true)
+            const formData = new FormData()
+            formData.append('file', pdfFile)
+            const uploadResult = await uploadRoutinePdf(formData)
+            setUploadingPdf(false)
+
+            if (uploadResult.error) {
+                alert(uploadResult.error)
+                setLoading(false)
+                return
+            }
+            finalPdfUrl = uploadResult.url
+        }
+
         const result = await createRoutine({
             activity_type: activityType,
             name,
             notes,
             global_structure: globalStructure,
             global_rpe: globalRpe,
+            pdf_url: finalPdfUrl,
             items: items.map((item, idx) => ({
                 exercise_id: item.exercise_id,
                 sets: Number(item.sets),
@@ -276,13 +320,55 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
                     <CardHeader>
                         <CardTitle>Notas Generales</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-4">
                         <Textarea
-                            className="min-h-[150px]"
+                            className="min-h-[120px]"
                             placeholder="Instrucciones generales para toda la semana..."
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
                         />
+
+                        {/* PDF Upload Section */}
+                        <div className="border-t border-border pt-4">
+                            <Label className="text-sm font-medium flex items-center gap-2 mb-3">
+                                <FileText className="h-4 w-4 text-red-500" />
+                                PDF Adjunto (opcional)
+                            </Label>
+                            {pdfFile ? (
+                                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border">
+                                    <div className="p-2 bg-red-500/10 rounded">
+                                        <FileText className="h-5 w-5 text-red-500" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium truncate">{pdfFile.name}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {(pdfFile.size / 1024 / 1024).toFixed(2)} MB
+                                        </p>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        onClick={handleRemovePdf}
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ) : (
+                                <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
+                                    <FileUp className="h-8 w-8 text-muted-foreground mb-2" />
+                                    <span className="text-sm text-muted-foreground">Click para seleccionar un PDF</span>
+                                    <span className="text-xs text-muted-foreground mt-1">Máximo 10MB</span>
+                                    <input
+                                        type="file"
+                                        accept=".pdf,application/pdf"
+                                        className="hidden"
+                                        onChange={handlePdfSelect}
+                                    />
+                                </label>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
             </div>
@@ -436,7 +522,7 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
             <div className="fixed bottom-6 right-6 z-50">
                 <Button size="lg" onClick={handleSubmit} disabled={loading} className="shadow-2xl rounded-full px-8 py-6 text-lg bg-green-600 hover:bg-green-700">
                     {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                    Guardar Rutina Completa
+                    {uploadingPdf ? 'Subiendo PDF...' : 'Guardar Rutina Completa'}
                 </Button>
             </div>
             <div className="h-20" /> {/* Spacer */}
