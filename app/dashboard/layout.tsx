@@ -21,10 +21,6 @@ export default async function DashboardLayout({
         .eq('id', user.id)
         .single()
 
-    console.log('[DashboardLayout] User ID:', user.id)
-    console.log('[DashboardLayout] Fetched Profile:', profile)
-    console.log('[DashboardLayout] Calculated Role:', profile?.role)
-
     const role = profile?.role || 'student'
 
     if (role === 'student' && !profile?.has_accepted_terms) {
