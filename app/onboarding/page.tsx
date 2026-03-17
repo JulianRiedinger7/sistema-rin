@@ -16,7 +16,14 @@ export default async function OnboardingPage() {
         .eq('id', user.id)
         .single()
 
-    if (profile?.has_accepted_terms) {
+    const { data: healthSheet } = await supabase
+        .from('health_sheets')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle()
+
+    if (profile?.has_accepted_terms && healthSheet) {
         redirect('/dashboard')
     }
 

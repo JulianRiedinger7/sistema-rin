@@ -6,6 +6,7 @@ import { User, Activity, HeartPulse, FileText, Calendar, Phone, CreditCard, Arro
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { EditStudentDialog } from './edit-student-dialog'
+import { getActivityLabel } from '@/lib/activity-types'
 
 export default async function AdminStudentProfilePage({
     params,
@@ -35,7 +36,8 @@ export default async function AdminStudentProfilePage({
         .from('health_sheets')
         .select('*')
         .eq('user_id', id)
-        .single()
+        .limit(1)
+        .maybeSingle()
 
     const calculateAge = (dob: string) => {
         if (!dob) return 'N/A'
@@ -45,14 +47,7 @@ export default async function AdminStudentProfilePage({
         return Math.abs(ageDate.getUTCFullYear() - 1970)
     }
 
-    const getActivityLabel = (type: string) => {
-        switch (type) {
-            case 'gym': return 'Gimnasio'
-            case 'pilates': return 'Pilates'
-            case 'mixed': return 'Mixto'
-            default: return type || '-'
-        }
-    }
+
 
     const { data: prices } = await supabase
         .from('activity_prices')

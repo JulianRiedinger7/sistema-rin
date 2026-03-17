@@ -16,12 +16,12 @@ export default async function DashboardPage() {
         .eq('id', user.id)
         .single()
 
-    // Check if health sheet exists
     const { data: healthSheet } = await supabase
         .from('health_sheets')
         .select('id')
         .eq('user_id', user.id)
-        .single()
+        .limit(1)
+        .maybeSingle()
 
     if (profile?.role === 'student' && !healthSheet) {
         redirect('/onboarding')
