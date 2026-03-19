@@ -5,20 +5,30 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { getPilatesConfig, getBookingsForWeek, updatePilatesConfig } from '@/app/dashboard/pilates/actions'
+import { getPilatesWeekConfig, getBookingsForWeek, updatePilatesWeekConfig, getSlotTeachers } from '@/app/dashboard/pilates/actions'
 import { PilatesConfig, Booking } from '@/app/dashboard/pilates/types'
+import { SlotTeacher } from '@/app/dashboard/pilates/actions'
 import { PilatesScheduler } from '@/components/pilates/scheduler-grid'
-import { Loader2, Settings, Users } from 'lucide-react'
+import { Loader2, Settings, Users, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
-import { startOfWeek, endOfWeek } from 'date-fns'
-import Link from 'next/link'
+import { endOfWeek, startOfMonth, addMonths, subMonths, format } from 'date-fns'
+import { es } from 'date-fns/locale'
+import { getWeeksInMonth } from '@/lib/date-utils'
+import { cn } from '@/lib/utils'
 
 export default function AdminPilatesPage() {
     const [config, setConfig] = useState<PilatesConfig | null>(null)
     const [bookings, setBookings] = useState<Booking[]>([])
+    const [teachers, setTeachers] = useState<SlotTeacher[]>([])
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [showConfig, setShowConfig] = useState(true)
+
+    const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()))
+    const [selectedWeekIdx, setSelectedWeekIdx] = useState(0)
+
+    const weeks = getWeeksInMonth(selectedMonth)
+    const activeWeek = weeks[selectedWeekIdx] || weeks[0]
 
     const [formConfig, setFormConfig] = useState({
         morning_start: 7,
@@ -28,10 +38,14 @@ export default function AdminPilatesPage() {
     })
 
     const fetchData = async () => {
+        if (!activeWeek) return
+
         setLoading(true)
-        const [configData, bookingsData] = await Promise.all([
-            getPilatesConfig(),
-            getBookingsForWeek(startOfWeek(new Date(), { weekStartsOn: 1 }), endOfWeek(new Date(), { weekStartsOn: 1 }))
+        const weekEnd = endOfWeek(activeWeek.start, { weekStartsOn: 1 })
+        const [configData, bookingsData, teachersData] = await Promise.all([
+            getPilatesWeekConfig(activeWeek.start),
+            getBookingsForWeek(activeWeek.start, weekEnd),
+            getSlotTeachers(activeWeek.start, weekEnd)
         ])
 
         if (configData) {
@@ -39,28 +53,28 @@ export default function AdminPilatesPage() {
             setFormConfig(configData)
         }
         if (bookingsData) setBookings(bookingsData)
+        setTeachers(teachersData)
 
         setLoading(false)
     }
 
     useEffect(() => {
         fetchData()
-    }, [])
+    }, [selectedMonth, selectedWeekIdx])
 
     const handleSaveConfig = async () => {
+        if (!activeWeek) return
         setSaving(true)
-        const res = await updatePilatesConfig(formConfig)
+        const res = await updatePilatesWeekConfig(activeWeek.start, formConfig)
         if (res.error) {
             toast.error(res.error)
         } else {
-            toast.success('Configuración actualizada')
+            toast.success('Configuración de la semana actualizada')
             setConfig(formConfig)
-            fetchData() // Refresh to redraw grid
+            fetchData()
         }
         setSaving(false)
     }
-
-    if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>
 
     return (
         <div className="container mx-auto py-6 space-y-6">
@@ -80,11 +94,49 @@ export default function AdminPilatesPage() {
                 </div>
             </div>
 
-            {showConfig && (
+            {/* Selector de Mes */}
+            <div className="flex items-center justify-between bg-card border rounded-lg p-2 max-w-sm">
+                <Button variant="ghost" size="icon" onClick={() => { setSelectedMonth(subMonths(selectedMonth, 1)); setSelectedWeekIdx(0); }}>
+                    <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="font-semibold capitalize">
+                    {format(selectedMonth, 'MMMM yyyy', { locale: es })}
+                </span>
+                <Button variant="ghost" size="icon" onClick={() => { setSelectedMonth(addMonths(selectedMonth, 1)); setSelectedWeekIdx(0); }}>
+                    <ChevronRight className="w-4 h-4" />
+                </Button>
+            </div>
+
+            {/* Selector de Semanas estilo Tab */}
+            {weeks.length > 0 && (
+                <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-1 bg-muted p-1 rounded-xl w-fit">
+                        {weeks.map((week, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => setSelectedWeekIdx(idx)}
+                                className={cn(
+                                    "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                                    idx === selectedWeekIdx
+                                        ? "bg-primary text-primary-foreground shadow-sm"
+                                        : "text-muted-foreground hover:bg-background/50 hover:text-foreground"
+                                )}
+                            >
+                                {week.label}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="text-sm text-muted-foreground px-1 capitalize">
+                        {activeWeek?.dateRange}
+                    </p>
+                </div>
+            )}
+
+            {showConfig && activeWeek && (
                 <Card className="bg-muted/30 border-primary/20">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-lg flex items-center gap-2 text-primary">
-                            <Settings className="w-4 h-4" /> Configuración de Bandas Horarias
+                            <Settings className="w-4 h-4" /> Configuración de la {activeWeek.label}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -137,15 +189,19 @@ export default function AdminPilatesPage() {
                 </Card>
             )}
 
-            {config && (
+            {loading ? (
+                <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>
+            ) : config && activeWeek ? (
                 <PilatesScheduler
                     config={config}
                     initialBookings={bookings}
-                    userId="admin" // Admin doesn't book for self usually in this view
+                    userId="admin"
                     isAdmin={true}
-                    onBookingChange={fetchData} // Refresh on changes
+                    onBookingChange={fetchData}
+                    activeDays={activeWeek.days}
+                    slotTeachers={teachers}
                 />
-            )}
+            ) : null}
         </div>
     )
 }

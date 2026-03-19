@@ -274,16 +274,51 @@ export default function ActiveRoutineViewer({ routine, day }: { routine: any, da
                         {items.length === 0 ? (
                             <p className="text-center text-muted-foreground">Cargando ejercicios...</p>
                         ) : (
-                            items.map((item) => (
-                                <RoutineItemCard
-                                    key={item.id}
-                                    item={item}
-                                    isStarted={isStarted}
-                                    lastLog={lastLogs[item.exercises.id]}
-                                    inputs={inputs[item.id] || { weight: '', rpe: '', notes: '' }}
-                                    onInputChange={(field, val) => handleInputChange(item.id, field, val)}
-                                />
-                            ))
+                            (() => {
+                                // Group items by block_index (supports multiple blocks with same name)
+                                const blocksMap = new Map<number, { name: string; items: typeof items }>()
+                                for (const item of items) {
+                                    const idx = item.block_index ?? 0
+                                    if (!blocksMap.has(idx)) {
+                                        blocksMap.set(idx, { name: item.block_type, items: [] })
+                                    }
+                                    blocksMap.get(idx)!.items.push(item)
+                                }
+                                // Sort by block_index to preserve admin's order
+                                const blocks = Array.from(blocksMap.entries())
+                                    .sort(([a], [b]) => a - b)
+                                    .map(([idx, block]) => ({ ...block, index: idx }))
+
+                                const blockColors: Record<string, string> = {
+                                    'Fuerza': 'border-l-blue-500 bg-blue-500/5',
+                                    'Aerobico': 'border-l-green-500 bg-green-500/5',
+                                    'Potencia': 'border-l-red-500 bg-red-500/5',
+                                    'Movilidad': 'border-l-yellow-500 bg-yellow-500/5',
+                                    'Calentamiento': 'border-l-orange-500 bg-orange-500/5',
+                                    'Core': 'border-l-cyan-500 bg-cyan-500/5',
+                                    'Elongacion': 'border-l-pink-500 bg-pink-500/5',
+                                }
+                                const getColor = (name: string) => blockColors[name] || 'border-l-purple-500 bg-purple-500/5'
+
+                                return blocks.map((block) => (
+                                    <div key={`block-${block.index}`} className="space-y-3">
+                                        <div className={cn("border-l-4 px-4 py-2 rounded-r-lg", getColor(block.name))}>
+                                            <h3 className="font-semibold text-sm tracking-wide uppercase">{block.name}</h3>
+                                            <p className="text-xs text-muted-foreground">{block.items.length} ejercicio{block.items.length !== 1 ? 's' : ''}</p>
+                                        </div>
+                                        {block.items.map((item) => (
+                                            <RoutineItemCard
+                                                key={item.id}
+                                                item={item}
+                                                isStarted={isStarted}
+                                                lastLog={lastLogs[item.exercises.id]}
+                                                inputs={inputs[item.id] || { weight: '', rpe: '', notes: '' }}
+                                                onInputChange={(field, val) => handleInputChange(item.id, field, val)}
+                                            />
+                                        ))}
+                                    </div>
+                                ))
+                            })()
                         )}
 
                         <div className="h-20" />

@@ -12,15 +12,18 @@ import { saveHealthProfile } from './actions'
 import { useState } from 'react'
 import { Loader2, User, Activity, HeartPulse, FileText, Scale, Ruler, Home, Phone } from 'lucide-react'
 
+import { ACTIVITY_TYPES, PILATES_CLASS_OPTIONS, hasPilatesAccess, lookupPrice, formatPrice } from '@/lib/activity-types'
+
 export function OnboardingForm({ initialDni, prices }: { initialDni: string, prices: any[] }) {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    // Helper to get formatted price
-    const getPriceText = (type: string) => {
-        const p = prices?.find(p => p.activity_type === type)
-        return p ? `$${p.price.toLocaleString('es-AR')}` : '-'
-    }
+    const [selectedActivity, setSelectedActivity] = useState('')
+    const [weeklyClasses, setWeeklyClasses] = useState<number | null>(null)
+
+    const displayPrice = selectedActivity
+        ? lookupPrice(prices || [], selectedActivity, weeklyClasses)
+        : null
 
     // State for conditional inputs...
     /* unchanged state hooks */
@@ -31,20 +34,6 @@ export function OnboardingForm({ initialDni, prices }: { initialDni: string, pri
     const [hadSurgery, setHadSurgery] = useState("no")
     const [hasPhysicalLimitation, setHasPhysicalLimitation] = useState("no")
 
-    /* ... inside return ... */
-    /*
-                                        <Label htmlFor="activityType">Actividad Contratada</Label>
-                                        <Select name="activityType" required>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Seleccionar..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="gym">Gimnasio ({getPriceText('gym')})</SelectItem>
-                                                <SelectItem value="pilates">Pilates ({getPriceText('pilates')})</SelectItem>
-                                                <SelectItem value="mixed">Mixto ({getPriceText('mixed')})</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-    */
 
     const handleSubmit = async (formData: FormData) => {
         setLoading(true)
@@ -101,17 +90,47 @@ export function OnboardingForm({ initialDni, prices }: { initialDni: string, pri
                                 </div>
                                 <div className="space-y-2 md:col-span-2">
                                     <Label htmlFor="activityType">Actividad Contratada</Label>
-                                    <Select name="activityType" required>
+                                    <Select name="activityType" required value={selectedActivity} onValueChange={(v) => { setSelectedActivity(v); if (!hasPilatesAccess(v)) setWeeklyClasses(null) }}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Seleccionar..." />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="gym">Gimnasio ({getPriceText('gym')})</SelectItem>
-                                            <SelectItem value="pilates">Pilates ({getPriceText('pilates')})</SelectItem>
-                                            <SelectItem value="mixed">Mixto ({getPriceText('mixed')})</SelectItem>
+                                            {ACTIVITY_TYPES.map(a => (
+                                                <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
+                                {hasPilatesAccess(selectedActivity) && (
+                                    <div className="space-y-2 md:col-span-2">
+                                        <Label>Clases de Pilates por semana</Label>
+                                        <input type="hidden" name="pilatesWeeklyClasses" value={weeklyClasses?.toString() || ''} />
+                                        <Select required value={weeklyClasses?.toString() || ''} onValueChange={(v) => setWeeklyClasses(Number(v))}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Cantidad de clases semanales..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {PILATES_CLASS_OPTIONS.map(o => (
+                                                    <SelectItem key={o.value} value={o.value.toString()}>{o.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+                                {selectedActivity && (
+                                    <div className="md:col-span-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                                        <p className="text-sm text-muted-foreground">Cuota mensual:</p>
+                                        {hasPilatesAccess(selectedActivity) && !weeklyClasses ? (
+                                            <p className="text-sm text-amber-500 mt-1">Seleccioná la cantidad de clases para ver el precio</p>
+                                        ) : displayPrice ? (
+                                            <p className="text-2xl font-bold text-primary">${displayPrice.toLocaleString('es-AR')}</p>
+                                        ) : selectedActivity === 'trial' ? (
+                                            <p className="text-2xl font-bold text-green-600">Gratis</p>
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground">-</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

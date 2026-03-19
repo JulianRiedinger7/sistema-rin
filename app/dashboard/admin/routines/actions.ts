@@ -14,6 +14,7 @@ interface RoutineItem {
     order_index: number
     day_number: number
     block_type: string
+    block_index: number
 }
 
 interface CreateRoutineData {
@@ -100,7 +101,8 @@ export async function createRoutine(data: CreateRoutineData) {
         notes: item.notes,
         order_index: item.order_index,
         day_number: item.day_number,
-        block_type: item.block_type
+        block_type: item.block_type,
+        block_index: item.block_index
     }))
 
     const { error: itemsError } = await supabase

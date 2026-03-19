@@ -12,7 +12,8 @@ const OnboardingSchema = z.object({
     address: z.string().min(1, "Domicilio requerido"),
     emergencyPhone: z.string().min(6, "Teléfono de emergencia inválido"),
     dateOfBirth: z.string().refine((val) => !isNaN(Date.parse(val)), "Fecha inválida"),
-    activityType: z.enum(["gym", "pilates", "mixed"]),
+    activityType: z.enum(["gym", "pilates", "mixed", "trial"]),
+    pilatesWeeklyClasses: z.string().optional(),
 
     // Metrics
     weight: z.string().min(1, "Peso requerido"),
@@ -81,6 +82,7 @@ export async function saveHealthProfile(formData: FormData) {
         emergencyPhone: getStr('emergencyPhone'),
         dateOfBirth: getStr('dateOfBirth'),
         activityType: getStr('activityType'),
+        pilatesWeeklyClasses: getStr('pilatesWeeklyClasses'),
         weight: getStr('weight'),
         height: getStr('height'),
         goals: getStr('goals'),
@@ -122,6 +124,7 @@ export async function saveHealthProfile(formData: FormData) {
             emergency_phone: data.emergencyPhone,
             date_of_birth: data.dateOfBirth,
             activity_type: data.activityType,
+            pilates_weekly_classes: data.pilatesWeeklyClasses ? parseInt(data.pilatesWeeklyClasses) : null,
             health_declaration_date: new Date().toISOString(),
             has_accepted_terms: true
         })

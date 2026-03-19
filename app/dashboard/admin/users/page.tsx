@@ -9,11 +9,12 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Eye } from 'lucide-react'
+import { Eye, Clock, CheckCircle, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import { CreateStudentDialog } from './create-student-dialog'
 import { UserSearch } from './user-search'
 import { DeleteStudentButton } from './delete-student-button'
+import { calculateQuotaInfo } from '@/lib/quota-utils'
 
 export default async function UsersPage({
     searchParams,
@@ -39,36 +40,6 @@ export default async function UsersPage({
         return <div>Error al cargar alumnos</div>
     }
 
-    // Helper to calc status
-    const getUserStatus = (user: any) => {
-        const now = new Date()
-        // 1. Is New? (< 30 days created)
-        const created = new Date(user.created_at)
-        const diffCreated = (now.getTime() - created.getTime()) / (1000 * 3600 * 24)
-
-        // 2. Latest Payment
-        const payments = user.payments || []
-        const paidPayments = payments
-            .filter((p: any) => p.status === 'paid')
-            .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-
-        // Check Active Logic
-        let isActive = false
-        if (diffCreated <= 30) isActive = true
-        else if (paidPayments.length > 0) {
-            const lastPay = new Date(paidPayments[0].date)
-            const diffPay = (now.getTime() - lastPay.getTime()) / (1000 * 3600 * 24)
-            if (diffPay <= 30) isActive = true
-        }
-
-        if (isActive) return { label: 'AL DÍA', color: 'bg-green-100 text-green-700' }
-
-        // Check Pending (has pending payment? or just overdue?)
-        // If not active, and has previous payments, it's "Moroso" or "Baja".
-        // Let's simplified: If not active -> Vencido
-        return { label: 'VENCIDO', color: 'bg-red-100 text-red-700' }
-    }
-
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -84,7 +55,7 @@ export default async function UsersPage({
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nombre</TableHead>
-                            <TableHead>DNI</TableHead>
+                            <TableHead>Días Restantes</TableHead>
                             <TableHead>Fecha de Ingreso</TableHead>
                             <TableHead>Estado Cuota</TableHead>
                             <TableHead>Estado T&C</TableHead>
@@ -100,15 +71,36 @@ export default async function UsersPage({
                             </TableRow>
                         )}
                         {users?.map((user) => {
-                            const status = getUserStatus(user)
+                            const quota = calculateQuotaInfo(
+                                user.created_at,
+                                user.payments || []
+                            )
+
                             return (
                                 <TableRow key={user.id}>
                                     <TableCell className="font-medium">{user.full_name || 'Sin Nombre'}</TableCell>
-                                    <TableCell>{user.dni || '-'}</TableCell>
+                                    <TableCell>
+                                        {quota.isExpired ? (
+                                            <div className="flex items-center gap-1.5">
+                                                <AlertCircle className="h-4 w-4 text-red-500" />
+                                                <span className="text-red-500 font-semibold text-sm">Vencida</span>
+                                            </div>
+                                        ) : quota.isAboutToExpire ? (
+                                            <div className="flex items-center gap-1.5">
+                                                <Clock className="h-4 w-4 text-yellow-500" />
+                                                <span className="text-yellow-500 font-semibold text-sm">{quota.daysRemaining}d</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-1.5">
+                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                                <span className="text-green-500 font-semibold text-sm">{quota.daysRemaining}d</span>
+                                            </div>
+                                        )}
+                                    </TableCell>
                                     <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
                                     <TableCell>
-                                        <Badge variant="secondary" className={`${status.color} hover:${status.color} border-0`}>
-                                            {status.label}
+                                        <Badge variant="secondary" className={`${quota.statusColor} hover:${quota.statusColor} border-0`}>
+                                            {quota.statusLabel}
                                         </Badge>
                                     </TableCell>
                                     <TableCell>

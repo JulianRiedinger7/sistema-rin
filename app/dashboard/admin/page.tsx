@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { DashboardStats } from './dashboard-stats'
+import { ActivityStats } from './activity-stats'
 
 export default async function AdminDashboard() {
     const supabase = await createClient()
@@ -7,7 +8,7 @@ export default async function AdminDashboard() {
     // Fetch all student profiles
     const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, created_at, full_name')
+        .select('id, created_at, full_name, activity_type, pilates_weekly_classes')
         .eq('role', 'student')
 
     // Fetch all payments
@@ -26,6 +27,9 @@ export default async function AdminDashboard() {
                 profiles={profiles || []}
                 payments={payments || []}
             />
+
+            <ActivityStats profiles={profiles || []} />
+
 
             {/* Hint for Users List */}
             {/* Since we have the users list in /admin/users, maybe we can embed it here later 

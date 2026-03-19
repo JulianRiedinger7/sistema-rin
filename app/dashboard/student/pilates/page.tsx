@@ -1,7 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { PilatesScheduler } from '@/components/pilates/scheduler-grid'
-import { getPilatesConfig, getBookingsForWeek } from '@/app/dashboard/pilates/actions'
 import { startOfWeek, endOfWeek } from 'date-fns'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -24,10 +23,9 @@ export default async function StudentPilatesPage() {
         .eq('id', user.id)
         .single()
 
-
-    // Allow Admins to view too. Check activity_type case-insensitively.
+    // Allow Admins to view too. Check activity_type for pilates access.
     const activityInfo = profile?.activity_type?.toLowerCase() || ''
-    const isAllowed = profile?.role === 'admin' || activityInfo.includes('pilates') || activityInfo.includes('mixto') || activityInfo.includes('mixed')
+    const isAllowed = profile?.role === 'admin' || ['pilates', 'mixed'].includes(activityInfo)
 
     if (!isAllowed) {
         return (
@@ -53,13 +51,8 @@ export default async function StudentPilatesPage() {
     }
 
     // Fetch Data for Schedule
-    // We re-use the client-side actions but call them server-side here or just duplicate fetch logic?
-    // Note: getPilatesConfig and getBookingsForWeek in 'actions.ts' use 'createClient' from '@/utils/supabase/client'
-    // This MIGHT NOT WORK in Server Component if that utility is browser-only.
-    // Let's check imports.
-    // If 'actions.ts' uses 'client', we should create a 'wrapper' client component OR just fetch data here directly using server supabase.
-
-    // Better approach for Server Component: Fetch directly here using 'supabase' server client.
+    const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+    const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 })
 
     const { data: configData } = await supabase
         .from('pilates_config')
@@ -76,8 +69,15 @@ export default async function StudentPilatesPage() {
     const { data: bookingsData } = await supabase
         .from('pilates_bookings')
         .select('*')
-        .gte('date', startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString().split('T')[0])
-        .lte('date', endOfWeek(new Date(), { weekStartsOn: 1 }).toISOString().split('T')[0])
+        .gte('date', weekStart.toISOString().split('T')[0])
+        .lte('date', weekEnd.toISOString().split('T')[0])
+
+    // Fetch teacher assignments for the current week
+    const { data: teachersData } = await supabase
+        .from('pilates_slot_teachers')
+        .select('date, hour, teacher_name')
+        .gte('date', weekStart.toISOString().split('T')[0])
+        .lte('date', weekEnd.toISOString().split('T')[0])
 
     return (
         <div className="container mx-auto py-6 space-y-6">
@@ -97,6 +97,7 @@ export default async function StudentPilatesPage() {
                 config={config}
                 initialBookings={bookingsData || []}
                 userId={user.id}
+                slotTeachers={teachersData || []}
             />
         </div>
     )

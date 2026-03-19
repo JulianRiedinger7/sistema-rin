@@ -14,8 +14,11 @@ create table if not exists activity_prices (
 -- 3. Seed Initial Data
 insert into activity_prices (activity_type, price) values
 ('gym', 25000),
-('pilates', 30000),
-('mixed', 45000)
+('pilates_8', 30000),
+('pilates_12', 35000),
+('mixed_8', 45000),
+('mixed_12', 55000),
+('trial', 0)
 on conflict (activity_type) do nothing;
 
 -- 4. Enable RLS for Activity Prices

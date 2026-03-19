@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { getActivityLabel } from '@/lib/activity-types'
 import {
     Table,
     TableBody,
@@ -33,14 +34,7 @@ export default async function RoutinesPage() {
         return <div>Error al cargar rutinas</div>
     }
 
-    const getActivityLabel = (type: string) => {
-        switch (type) {
-            case 'gym': return 'Gimnasio'
-            case 'pilates': return 'Pilates'
-            case 'mixed': return 'Mixto'
-            default: return type
-        }
-    }
+
 
     return (
         <div className="space-y-6">

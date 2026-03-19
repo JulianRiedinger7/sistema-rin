@@ -99,7 +99,8 @@ UPDATE profiles SET
   role = 'admin', 
   has_accepted_terms = true,
   phone = '1234567890',
-  activity_type = 'mixed'
+  activity_type = 'mixed',
+  pilates_weekly_classes = 2
 WHERE id = 'a0000000-0000-0000-0000-000000000001';
 
 -- Configurar alumno 1 (Gym) - perfil completo
@@ -113,6 +114,7 @@ WHERE id = 'b0000000-0000-0000-0000-000000000001';
 -- Configurar alumno 2 (Pilates) - perfil completo
 UPDATE profiles SET 
   activity_type = 'pilates',
+  pilates_weekly_classes = 2,
   has_accepted_terms = true,
   phone = '2222222222',
   date_of_birth = '1998-06-20'

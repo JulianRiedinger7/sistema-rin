@@ -14,6 +14,7 @@ import { PriceConfigDialog } from './price-config-dialog'
 import { RegisterPaymentDialog } from './payment-dialog'
 import { Input } from '@/components/ui/input' // Note: Should move search to client component
 import PaymentSearch from './payment-search'
+import { getActivityLabel } from '@/lib/activity-types'
 
 export default async function PaymentsAdminPage({
     searchParams,
@@ -46,14 +47,7 @@ export default async function PaymentsAdminPage({
         .from('activity_prices')
         .select('*')
 
-    const getActivityLabel = (type: string) => {
-        switch (type) {
-            case 'gym': return 'Gimnasio'
-            case 'pilates': return 'Pilates'
-            case 'mixed': return 'Mixto'
-            default: return type || '-'
-        }
-    }
+
 
     return (
         <div className="space-y-6">

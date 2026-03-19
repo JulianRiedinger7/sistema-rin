@@ -7,15 +7,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Check, Circle, User, Users, Lock, X, Trash2, Plus, Search } from 'lucide-react'
+import { Check, Circle, User, Users, Lock, X, Trash2, Plus, Search, GraduationCap } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { bookSlot, cancelBooking, searchUsers } from '@/app/dashboard/pilates/actions'
+import { bookSlot, cancelBooking, searchUsers, setSlotTeacher } from '@/app/dashboard/pilates/actions'
 import { Booking } from '@/app/dashboard/pilates/types'
+import { SlotTeacher } from '@/app/dashboard/pilates/actions'
 import { adminBookSlot, adminCancelBooking } from '@/app/dashboard/pilates/admin-actions'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useDebounce } from 'use-debounce'
 
 const MAX_CAPACITY = 5
@@ -31,17 +33,16 @@ interface SchedulerProps {
     userId: string
     isAdmin?: boolean
     onBookingChange?: () => void
+    /** The Mon-Fri days to display. Days not in this array are rendered as empty cells. */
+    activeDays?: Date[]
+    /** All slot-teacher assignments for the displayed week */
+    slotTeachers?: SlotTeacher[]
 }
 
-export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onBookingChange }: SchedulerProps) {
+export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onBookingChange, activeDays, slotTeachers = [] }: SchedulerProps) {
     const [currentDate, setCurrentDate] = useState(() => {
         const now = new Date()
         if (isSaturday(now) || isSunday(now)) {
-            return addDays(now, isSaturday(now) ? 2 : 1) // Jump to next Monday roughly, or just let startOfWeek handle it?
-            // Actually, simply adding 1 week is safer if we just want "Next Week's" scope.
-            // But startOfWeek is used later. 
-            // If today is Sat, startOfWeek is last Mon.
-            // If we want Next Mon, we need a date in next week.
             return addWeeks(now, 1)
         }
         return now
@@ -55,15 +56,37 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
     const [debouncedQuery] = useDebounce(searchQuery, 500)
     const [searchResults, setSearchResults] = useState<any[]>([])
     const [isSearching, setIsSearching] = useState(false)
+    const [teacherInput, setTeacherInput] = useState('')
+    const [savingTeacher, setSavingTeacher] = useState(false)
 
     // Calculate dynamic hours based on config
     const morningHours = Array.from({ length: config.morning_end - config.morning_start + 1 }, (_, i) => config.morning_start + i)
     const afternoonHours = Array.from({ length: config.afternoon_end - config.afternoon_start + 1 }, (_, i) => config.afternoon_start + i)
     const allHours = [...morningHours, ...afternoonHours].sort((a, b) => a - b)
 
-    // Generate week days
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }) // Monday
-    const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)) // Mon-Fri
+    // Generate week days: use activeDays if provided, otherwise compute from current date
+    let weekDays: Date[]
+    if (activeDays && activeDays.length > 0) {
+        // Determine the Monday of the week that contains the first active day
+        const firstActive = activeDays[0]
+        const weekStart = startOfWeek(firstActive, { weekStartsOn: 1 })
+        // Always generate Mon-Fri for the grid columns
+        weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i))
+    } else {
+        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 })
+        weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i))
+    }
+
+    // Helper: is this day one of the active days?
+    const isDayActive = (day: Date) => {
+        if (!activeDays || activeDays.length === 0) return true // no filtering
+        return activeDays.some(ad => isSameDay(ad, day))
+    }
+
+    // Helper: get teacher for a slot
+    const getTeacher = (dateStr: string, hour: number): string | undefined => {
+        return slotTeachers.find(t => t.date === dateStr && t.hour === hour)?.teacher_name
+    }
 
     // Search Effect
     useEffect(() => {
@@ -79,6 +102,15 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
         }
         fetchUsers()
     }, [debouncedQuery])
+
+    // When selectedSlot changes, populate teacher input
+    useEffect(() => {
+        if (selectedSlot) {
+            const dateStr = format(selectedSlot.date, 'yyyy-MM-dd')
+            const existing = getTeacher(dateStr, selectedSlot.hour)
+            setTeacherInput(existing || '')
+        }
+    }, [selectedSlot])
 
 
     const handleSlotClick = async (date: Date, hour: number, capacity: number, isBooked: boolean, bookings: Booking[]) => {
@@ -162,6 +194,19 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
         }
     }
 
+    const handleSaveTeacher = async () => {
+        if (!selectedSlot) return
+        setSavingTeacher(true)
+        const res = await setSlotTeacher(selectedSlot.date, selectedSlot.hour, teacherInput)
+        if (res.error) {
+            toast.error(res.error)
+        } else {
+            toast.success(teacherInput.trim() ? 'Profesor asignado' : 'Profesor removido')
+            refreshData()
+        }
+        setSavingTeacher(false)
+    }
+
     const refreshData = () => {
         if (onBookingChange) onBookingChange()
         else router.refresh()
@@ -185,11 +230,19 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
                     <div className="pt-12"></div>
 
                     {/* Days Headers */}
-                    {weekDays.map((day) => (
-                        <div key={day.toString()} className="text-center p-4 bg-background rounded-lg border font-bold uppercase text-sm tracking-wider">
-                            {format(day, 'EEEE', { locale: es })}
-                        </div>
-                    ))}
+                    {weekDays.map((day) => {
+                        const active = isDayActive(day)
+                        return (
+                            <div key={day.toString()} className={cn(
+                                "text-center p-4 rounded-lg border text-sm tracking-wider transition-colors",
+                                active
+                                    ? "bg-background font-bold uppercase"
+                                    : "bg-transparent border-transparent"
+                            )}>
+                                {active ? format(day, 'EEEE d', { locale: es }) : ''}
+                            </div>
+                        )
+                    })}
 
                     {/* Grid Rows */}
                     {allHours.map((hour) => {
@@ -207,11 +260,24 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
                                 {/* Day Slots */}
                                 {weekDays.map((day) => {
                                     const dateStr = format(day, 'yyyy-MM-dd')
+                                    const active = isDayActive(day)
+
+                                    // Inactive day: render empty spacer cell
+                                    if (!active) {
+                                        return (
+                                            <div
+                                                key={`${dateStr}-${hour}`}
+                                                className="h-24"
+                                            />
+                                        )
+                                    }
+
                                     const slotBookings = initialBookings.filter(b => b.date === dateStr && b.hour === hour)
                                     const count = slotBookings.length
                                     const isBooked = slotBookings.some(b => b.user_id === userId)
                                     const isFull = count >= MAX_CAPACITY
                                     const isLoading = loading === `${dateStr}-${hour}`
+                                    const teacher = getTeacher(dateStr, hour)
 
                                     // Check cancellation capability for UI
                                     const classIsoString = `${dateStr}T${hour.toString().padStart(2, '0')}:00:00.000-03:00`
@@ -263,7 +329,15 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
                                                 {isAdmin && count >= MAX_CAPACITY && <Badge variant="destructive" className="text-[10px] h-4 px-1">LLENO</Badge>}
                                             </div>
 
-                                            <div className="space-y-2">
+                                            {/* Teacher label */}
+                                            {teacher && (
+                                                <div className="flex items-center gap-1 text-[10px] text-purple-600 dark:text-purple-400 font-semibold truncate">
+                                                    <GraduationCap className="w-3 h-3 shrink-0" />
+                                                    <span className="truncate">{teacher}</span>
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-1">
                                                 {/* Circles Indicator */}
                                                 <div className="flex gap-1">
                                                     {[...Array(MAX_CAPACITY)].map((_, i) => (
@@ -306,6 +380,35 @@ export function PilatesScheduler({ config, initialBookings, userId, isAdmin, onB
                     </DialogHeader>
 
                     <div className="space-y-6">
+                        {/* Teacher Assignment (Admin only) */}
+                        {isAdmin && (
+                            <div className="space-y-2 p-3 bg-purple-50/50 dark:bg-purple-900/10 rounded-lg border border-purple-200/50 dark:border-purple-800/30">
+                                <Label className="text-xs font-bold uppercase text-purple-700 dark:text-purple-400 flex items-center gap-1.5">
+                                    <GraduationCap className="w-3.5 h-3.5" /> Profesor Asignado
+                                </Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="Nombre del profesor..."
+                                        value={teacherInput}
+                                        onChange={e => setTeacherInput(e.target.value)}
+                                        className="flex-1"
+                                    />
+                                    <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={handleSaveTeacher}
+                                        disabled={savingTeacher}
+                                        className="bg-purple-100 hover:bg-purple-200 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                                    >
+                                        {savingTeacher ? '...' : 'Guardar'}
+                                    </Button>
+                                </div>
+                                {teacherInput.trim() === '' && (
+                                    <p className="text-[10px] text-muted-foreground">Dejá vacío y guardá para remover el profesor.</p>
+                                )}
+                            </div>
+                        )}
+
                         {/* Enrolled Students */}
                         <div className="space-y-2">
                             <h4 className="text-sm font-medium text-muted-foreground">Alumnos Inscriptos ({selectedSlot?.bookings.length}/{MAX_CAPACITY})</h4>

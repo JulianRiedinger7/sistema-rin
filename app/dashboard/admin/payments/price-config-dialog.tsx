@@ -21,7 +21,7 @@ export function PriceConfigDialog({ prices }: { prices: any[] }) {
                         Ajusta los valores para cada actividad.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="py-2">
+                <div className="py-2 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
                     <PriceConfig prices={prices} />
                 </div>
             </DialogContent>

@@ -26,18 +26,12 @@ import {
     DialogContent,
     DialogTitle,
 } from '@/components/ui/dialog'
-import { Check, ChevronsUpDown, Trash2, Plus, GripVertical, FileUp, FileText, X } from 'lucide-react'
+import { Check, Trash2, Plus, FileUp, FileText, X, ChevronUp, ChevronDown, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createRoutine, uploadRoutinePdf } from './actions'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
 
 // Types
-interface Student {
-    id: string
-    full_name: string
-}
-
 interface Exercise {
     id: string
     name: string
@@ -45,9 +39,41 @@ interface Exercise {
     muscle_group?: string
 }
 
-// Props
-interface RoutineBuilderProps {
-    exercises: Exercise[]
+interface BlockItem {
+    exercise_id: string
+    exercise_name: string
+    exercise_category: string
+    sets: number
+    reps: string
+    target_rpe: number
+    notes: string
+}
+
+interface Block {
+    id: string
+    name: string
+    items: BlockItem[]
+}
+
+interface DayData {
+    blocks: Block[]
+}
+
+const BLOCK_COLORS: Record<string, string> = {
+    'Fuerza': 'border-l-blue-500',
+    'Aerobico': 'border-l-green-500',
+    'Potencia': 'border-l-red-500',
+    'Movilidad': 'border-l-yellow-500',
+}
+
+const BLOCK_SUGGESTIONS = ['Fuerza', 'Aerobico', 'Potencia', 'Movilidad', 'Calentamiento', 'Core', 'Elongacion']
+
+function getBlockColor(name: string): string {
+    return BLOCK_COLORS[name] || 'border-l-purple-500'
+}
+
+function generateBlockId(): string {
+    return Math.random().toString(36).substring(2, 9)
 }
 
 export default function RoutineBuilder({ exercises }: { exercises: Exercise[] }) {
@@ -55,24 +81,33 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
     const [loading, setLoading] = useState(false)
 
     // Global Settings
-    const [activityType, setActivityType] = useState<string>('')
+    const [activityType, setActivityType] = useState<string>('gym')
     const [name, setName] = useState('')
     const [globalStructure, setGlobalStructure] = useState('')
     const [globalRpe, setGlobalRpe] = useState('')
     const [notes, setNotes] = useState('')
     const [pdfFile, setPdfFile] = useState<File | null>(null)
-    const [pdfUrl, setPdfUrl] = useState<string | null>(null)
     const [uploadingPdf, setUploadingPdf] = useState(false)
 
     // 5-Day Structure State
-    const [activeDay, setActiveDay] = useState(1) // 1-5
+    const [activeDay, setActiveDay] = useState(1)
 
-    // Items state
-    const [items, setItems] = useState<any[]>([])
+    // Days data: each day has an ordered array of blocks
+    const [days, setDays] = useState<Record<number, DayData>>({
+        1: { blocks: [] },
+        2: { blocks: [] },
+        3: { blocks: [] },
+        4: { blocks: [] },
+        5: { blocks: [] },
+    })
 
     // Exercise selection state
-    const [openDialog, setOpenDialog] = useState(false) // Changed to Dialog
-    const [targetBlockForAdd, setTargetBlockForAdd] = useState<'Fuerza' | 'Aerobico' | 'Potencia' | 'Movilidad' | null>(null)
+    const [openDialog, setOpenDialog] = useState(false)
+    const [targetBlockId, setTargetBlockId] = useState<string | null>(null)
+
+    // New block creation state
+    const [showNewBlockInput, setShowNewBlockInput] = useState(false)
+    const [newBlockName, setNewBlockName] = useState('')
 
     // Helper to parse global structure
     const parseStructure = (str: string) => {
@@ -88,118 +123,209 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
 
     const structurePreview = parseStructure(globalStructure)
 
-    // Sync items with global settings
+    // Current day data
+    const currentDayData = days[activeDay]
+
+    // Sync global structure to Fuerza items
     useEffect(() => {
         const structure = parseStructure(globalStructure)
         const rpeNum = globalRpe ? parseFloat(globalRpe) : null
 
-        setItems(prev => prev.map(item => {
-            if (item.block_type !== 'Fuerza') return item
-
-            const changes: any = {}
-
-            // Sync structure if valid
-            if (structure) {
-                changes.sets = structure.sets
-                changes.reps = globalStructure
+        setDays(prev => {
+            const updated = { ...prev }
+            for (const dayNum of [1, 2, 3, 4, 5]) {
+                const dayData = { ...updated[dayNum] }
+                dayData.blocks = dayData.blocks.map(block => {
+                    if (block.name !== 'Fuerza') return block
+                    return {
+                        ...block,
+                        items: block.items.map(item => {
+                            const changes: Partial<BlockItem> = {}
+                            if (structure) {
+                                changes.sets = structure.sets
+                                changes.reps = globalStructure
+                            }
+                            if (rpeNum !== null && !isNaN(rpeNum)) {
+                                changes.target_rpe = rpeNum
+                            }
+                            return { ...item, ...changes }
+                        })
+                    }
+                })
+                updated[dayNum] = dayData
             }
+            return updated
+        })
+    }, [globalStructure, globalRpe])
 
-            // Sync RPE if global is set and parsable (or strictly if existing)
-            // If the user wants global RPE to override individual, we update it.
-            if (!isNaN(rpeNum!) && rpeNum !== null) {
-                changes.target_rpe = rpeNum
-            } else if (globalRpe && item.target_rpe === 0) {
-                // heuristic: if it was 0 (defaulted) and now global is cleared/changed?
-            }
+    // ---- Block Management ----
 
-            return { ...item, ...changes }
-        }))
-    }, [globalStructure, globalRpe]) // Dependencies: run when these change
+    const handleAddBlock = () => {
+        const trimmed = newBlockName.trim()
+        if (!trimmed) return
+
+        setDays(prev => {
+            const dayData = { ...prev[activeDay] }
+            dayData.blocks = [...dayData.blocks, {
+                id: generateBlockId(),
+                name: trimmed,
+                items: [],
+            }]
+            return { ...prev, [activeDay]: dayData }
+        })
+
+        setNewBlockName('')
+        setShowNewBlockInput(false)
+    }
+
+    const handleRemoveBlock = (blockId: string) => {
+        setDays(prev => {
+            const dayData = { ...prev[activeDay] }
+            dayData.blocks = dayData.blocks.filter(b => b.id !== blockId)
+            return { ...prev, [activeDay]: dayData }
+        })
+    }
+
+    const handleMoveBlock = (blockId: string, direction: 'up' | 'down') => {
+        setDays(prev => {
+            const dayData = { ...prev[activeDay] }
+            const blocks = [...dayData.blocks]
+            const idx = blocks.findIndex(b => b.id === blockId)
+            if (idx === -1) return prev
+            if (direction === 'up' && idx === 0) return prev
+            if (direction === 'down' && idx === blocks.length - 1) return prev
+
+            const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+            const temp = blocks[idx]
+            blocks[idx] = blocks[swapIdx]
+            blocks[swapIdx] = temp
+
+            dayData.blocks = blocks
+            return { ...prev, [activeDay]: dayData }
+        })
+    }
+
+    // ---- Exercise Management ----
+
+    const openSearch = (blockId: string) => {
+        setTargetBlockId(blockId)
+        setOpenDialog(true)
+    }
 
     const handleAddExercise = (exerciseId: string) => {
-        if (!targetBlockForAdd) return
+        if (!targetBlockId) return
 
         const exercise = exercises.find(e => e.id === exerciseId)
         if (!exercise) return
 
-        const isFuerza = targetBlockForAdd === 'Fuerza'
-        const useGlobalConfig = isFuerza && !!globalStructure
+        setDays(prev => {
+            const dayData = { ...prev[activeDay] }
+            dayData.blocks = dayData.blocks.map(block => {
+                if (block.id !== targetBlockId) return block
 
-        // Parse global RPE for default
-        let defaultRpe = 7
-        if (isFuerza && globalRpe) {
-            const parsed = parseFloat(globalRpe)
-            if (!isNaN(parsed)) defaultRpe = parsed
-        }
+                const isFuerza = block.name === 'Fuerza'
+                const useGlobalConfig = isFuerza && !!globalStructure
 
-        setItems([...items, {
-            exercise_id: exercise.id,
-            exercise_name: exercise.name,
-            exercise_category: exercise.category,
-            day_number: activeDay,
-            block_type: targetBlockForAdd,
-            // If Fuerza and Global Structure exists, enforce it
-            sets: useGlobalConfig && structurePreview ? structurePreview.sets : 3,
-            reps: useGlobalConfig ? globalStructure : '10',
-            target_rpe: defaultRpe,
-            notes: '',
-            order_index: items.length
-        }])
+                let defaultRpe = 7
+                if (isFuerza && globalRpe) {
+                    const parsed = parseFloat(globalRpe)
+                    if (!isNaN(parsed)) defaultRpe = parsed
+                }
+
+                return {
+                    ...block,
+                    items: [...block.items, {
+                        exercise_id: exercise.id,
+                        exercise_name: exercise.name,
+                        exercise_category: exercise.category,
+                        sets: useGlobalConfig && structurePreview ? structurePreview.sets : 3,
+                        reps: useGlobalConfig ? globalStructure : '10',
+                        target_rpe: defaultRpe,
+                        notes: '',
+                    }]
+                }
+            })
+            return { ...prev, [activeDay]: dayData }
+        })
         setOpenDialog(false)
-        setTargetBlockForAdd(null)
+        setTargetBlockId(null)
     }
 
-    const handleUpdateItem = (index: number, field: string, value: any) => {
-        const newItems = [...items]
-        newItems[index] = { ...newItems[index], [field]: value }
-        setItems(newItems)
+    const handleUpdateItem = (blockId: string, itemIndex: number, field: string, value: any) => {
+        setDays(prev => {
+            const dayData = { ...prev[activeDay] }
+            dayData.blocks = dayData.blocks.map(block => {
+                if (block.id !== blockId) return block
+                const items = [...block.items]
+                items[itemIndex] = { ...items[itemIndex], [field]: value }
+                return { ...block, items }
+            })
+            return { ...prev, [activeDay]: dayData }
+        })
     }
 
-    const handleRemoveItem = (index: number) => {
-        setItems(items.filter((_, i) => i !== index))
+    const handleRemoveItem = (blockId: string, itemIndex: number) => {
+        setDays(prev => {
+            const dayData = { ...prev[activeDay] }
+            dayData.blocks = dayData.blocks.map(block => {
+                if (block.id !== blockId) return block
+                return { ...block, items: block.items.filter((_, i) => i !== itemIndex) }
+            })
+            return { ...prev, [activeDay]: dayData }
+        })
     }
 
-    const openSearch = (block: 'Fuerza' | 'Aerobico' | 'Potencia' | 'Movilidad') => {
-        setTargetBlockForAdd(block)
-        setOpenDialog(true)
-    }
-
-    // Filter items for current view
-    const getItemsForDayAndBlock = (day: number, block: string) => {
-        return items
-            .map((item, originalIndex) => ({ ...item, originalIndex }))
-            .filter(item => item.day_number === day && item.block_type === block)
-    }
-
+    // ---- PDF ----
     const handlePdfSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
-
         if (file.type !== 'application/pdf') {
             alert('Solo se permiten archivos PDF')
             return
         }
-
         if (file.size > 10 * 1024 * 1024) {
             alert('El archivo no puede superar los 10MB')
             return
         }
-
         setPdfFile(file)
     }
 
     const handleRemovePdf = () => {
         setPdfFile(null)
-        setPdfUrl(null)
     }
 
+    // ---- Submit ----
     const handleSubmit = async () => {
         if (!activityType || !name) {
             alert("Por favor completa el nombre y selecciona una actividad.")
             return
         }
 
-        if (items.length === 0) {
+        // Flatten all blocks into items with order_index and block_index
+        const allItems: any[] = []
+        for (const dayNum of [1, 2, 3, 4, 5]) {
+            let orderCounter = 0
+            let blockCounter = 0
+            const dayData = days[dayNum]
+            for (const block of dayData.blocks) {
+                for (const item of block.items) {
+                    allItems.push({
+                        exercise_id: item.exercise_id,
+                        sets: Number(item.sets),
+                        reps: String(item.reps),
+                        target_rpe: Number(item.target_rpe),
+                        notes: item.notes,
+                        order_index: orderCounter++,
+                        day_number: dayNum,
+                        block_type: block.name,
+                        block_index: blockCounter,
+                    })
+                }
+                blockCounter++
+            }
+        }
+
+        if (allItems.length === 0) {
             alert("Debes agregar al menos un ejercicio a la rutina.")
             return
         }
@@ -230,16 +356,7 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
             global_structure: globalStructure,
             global_rpe: globalRpe,
             pdf_url: finalPdfUrl,
-            items: items.map((item, idx) => ({
-                exercise_id: item.exercise_id,
-                sets: Number(item.sets),
-                reps: String(item.reps), // Ensure string
-                target_rpe: Number(item.target_rpe),
-                notes: item.notes,
-                order_index: idx,
-                day_number: item.day_number,
-                block_type: item.block_type
-            }))
+            items: allItems,
         })
 
         if (result.error) {
@@ -248,6 +365,11 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
         } else {
             router.push('/dashboard/admin/routines')
         }
+    }
+
+    // Count total items for a day
+    const getDayItemCount = (dayNum: number) => {
+        return days[dayNum].blocks.reduce((sum, b) => sum + b.items.length, 0)
     }
 
     return (
@@ -260,17 +382,10 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label>Actividad *</Label>
-                                <Select onValueChange={setActivityType}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="gym">Gimnasio</SelectItem>
-                                        <SelectItem value="pilates">Pilates</SelectItem>
-                                        <SelectItem value="mixed">Mixto</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <Label>Actividad</Label>
+                                <div className="flex items-center h-10 px-3 rounded-md border border-border bg-muted/50">
+                                    <span className="text-sm font-medium text-primary">Gimnasio</span>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <Label>Nombre Rutina *</Label>
@@ -375,54 +490,101 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
 
             {/* Day Tabs */}
             <div className="flex items-center gap-2 border-b border-border pb-1 overflow-x-auto">
-                {[1, 2, 3, 4, 5].map(day => (
-                    <button
-                        key={day}
-                        onClick={() => setActiveDay(day)}
-                        className={cn(
-                            "px-6 py-3 text-sm font-medium rounded-t-lg transition-colors border-b-2",
-                            activeDay === day
-                                ? "border-primary text-primary bg-primary/5"
-                                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                        )}
-                    >
-                        Día {day}
-                    </button>
-                ))}
+                {[1, 2, 3, 4, 5].map(day => {
+                    const itemCount = getDayItemCount(day)
+                    return (
+                        <button
+                            key={day}
+                            onClick={() => setActiveDay(day)}
+                            className={cn(
+                                "px-6 py-3 text-sm font-medium rounded-t-lg transition-colors border-b-2 flex items-center gap-2",
+                                activeDay === day
+                                    ? "border-primary text-primary bg-primary/5"
+                                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                            )}
+                        >
+                            Día {day}
+                            {itemCount > 0 && (
+                                <span className={cn(
+                                    "text-[10px] px-1.5 py-0.5 rounded-full",
+                                    activeDay === day ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                                )}>
+                                    {itemCount}
+                                </span>
+                            )}
+                        </button>
+                    )
+                })}
             </div>
 
-            {/* Daily Content */}
-            <div className="space-y-8 animate-in fade-in duration-300">
-                {['Fuerza', 'Aerobico', 'Potencia', 'Movilidad'].map((block) => {
-                    const blockItems = getItemsForDayAndBlock(activeDay, block)
-                    // Check if this block should enforce global structure
-                    const enforceGlobal = block === 'Fuerza' && !!globalStructure
+            {/* Daily Content - Dynamic Blocks */}
+            <div className="space-y-6 animate-in fade-in duration-300">
+                {currentDayData.blocks.length === 0 && !showNewBlockInput && (
+                    <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
+                        <p className="text-muted-foreground mb-4">
+                            No hay bloques para el Día {activeDay}. ¡Creá el primero!
+                        </p>
+                        <Button onClick={() => setShowNewBlockInput(true)} variant="outline" size="lg">
+                            <Plus className="mr-2 h-5 w-5" /> Agregar Bloque
+                        </Button>
+                    </div>
+                )}
+
+                {currentDayData.blocks.map((block, blockIndex) => {
+                    const enforceGlobal = block.name === 'Fuerza' && !!globalStructure
 
                     return (
-                        <Card key={block} className={cn("border-l-4",
-                            block === 'Fuerza' ? 'border-l-blue-500' :
-                                block === 'Aerobico' ? 'border-l-green-500' :
-                                    block === 'Potencia' ? 'border-l-red-500' : 'border-l-yellow-500'
-                        )}>
+                        <Card key={block.id} className={cn("border-l-4", getBlockColor(block.name))}>
                             <CardHeader className="flex flex-row items-center justify-between py-4">
                                 <CardTitle className="text-lg flex items-center gap-2">
-                                    {block}
+                                    {block.name}
                                     <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-1 rounded-full">
-                                        {blockItems.length} ejercicios
+                                        {block.items.length} ejercicios
                                     </span>
                                 </CardTitle>
-                                <Button size="sm" variant="outline" onClick={() => openSearch(block as any)}>
-                                    <Plus className="mr-2 h-4 w-4" /> Agregar
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8"
+                                        disabled={blockIndex === 0}
+                                        onClick={() => handleMoveBlock(block.id, 'up')}
+                                        title="Mover arriba"
+                                    >
+                                        <ChevronUp className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8"
+                                        disabled={blockIndex === currentDayData.blocks.length - 1}
+                                        onClick={() => handleMoveBlock(block.id, 'down')}
+                                        title="Mover abajo"
+                                    >
+                                        <ChevronDown className="h-4 w-4" />
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={() => openSearch(block.id)}>
+                                        <Plus className="mr-2 h-4 w-4" /> Agregar
+                                    </Button>
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        onClick={() => handleRemoveBlock(block.id)}
+                                        title="Eliminar bloque"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {blockItems.length === 0 ? (
+                                {block.items.length === 0 ? (
                                     <div className="text-center py-4 text-muted-foreground text-sm italic">
-                                        Sin ejercicios de {block} para el Día {activeDay}
+                                        Sin ejercicios — usá el botón "Agregar" para incluir ejercicios
                                     </div>
                                 ) : (
-                                    blockItems.map((item) => (
-                                        <div key={item.originalIndex} className="flex flex-col md:flex-row gap-4 p-4 rounded-lg bg-muted/20 border border-border items-start md:items-end">
+                                    block.items.map((item, itemIndex) => (
+                                        <div key={itemIndex} className="flex flex-col md:flex-row gap-4 p-4 rounded-lg bg-muted/20 border border-border items-start md:items-end">
                                             <div className="flex-1">
                                                 <p className="font-medium text-primary">{item.exercise_name}</p>
                                                 <p className="text-xs text-muted-foreground">{item.exercise_category}</p>
@@ -436,7 +598,7 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
                                                         type="number"
                                                         value={item.sets}
                                                         disabled={enforceGlobal}
-                                                        onChange={(e) => handleUpdateItem(item.originalIndex, 'sets', e.target.value)}
+                                                        onChange={(e) => handleUpdateItem(block.id, itemIndex, 'sets', e.target.value)}
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
@@ -446,7 +608,7 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
                                                         value={item.reps}
                                                         disabled={enforceGlobal}
                                                         placeholder="10/10/8"
-                                                        onChange={(e) => handleUpdateItem(item.originalIndex, 'reps', e.target.value)}
+                                                        onChange={(e) => handleUpdateItem(block.id, itemIndex, 'reps', e.target.value)}
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
@@ -455,7 +617,7 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
                                                         className="h-8 w-16"
                                                         type="number"
                                                         value={item.target_rpe}
-                                                        onChange={(e) => handleUpdateItem(item.originalIndex, 'target_rpe', e.target.value)}
+                                                        onChange={(e) => handleUpdateItem(block.id, itemIndex, 'target_rpe', e.target.value)}
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
@@ -464,7 +626,7 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
                                                         className="h-8 w-32"
                                                         value={item.notes}
                                                         placeholder="Notas..."
-                                                        onChange={(e) => handleUpdateItem(item.originalIndex, 'notes', e.target.value)}
+                                                        onChange={(e) => handleUpdateItem(block.id, itemIndex, 'notes', e.target.value)}
                                                     />
                                                 </div>
                                             </div>
@@ -473,7 +635,7 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                onClick={() => handleRemoveItem(item.originalIndex)}
+                                                onClick={() => handleRemoveItem(block.id, itemIndex)}
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
@@ -484,6 +646,54 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
                         </Card>
                     )
                 })}
+
+                {/* Add Block Section */}
+                {showNewBlockInput ? (
+                    <Card className="border-2 border-dashed border-primary/30 bg-primary/5">
+                        <CardContent className="py-4 space-y-3">
+                            <Label className="font-semibold">Nombre del Bloque</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Ej: Fuerza, Aerobico, Core..."
+                                    value={newBlockName}
+                                    onChange={(e) => setNewBlockName(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddBlock() }}
+                                    autoFocus
+                                />
+                                <Button onClick={handleAddBlock} disabled={!newBlockName.trim()}>
+                                    <Plus className="mr-2 h-4 w-4" /> Crear
+                                </Button>
+                                <Button variant="ghost" onClick={() => { setShowNewBlockInput(false); setNewBlockName('') }}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            {/* Quick suggestions */}
+                            <div className="flex flex-wrap gap-2">
+                                {BLOCK_SUGGESTIONS.filter(s =>
+                                    !currentDayData.blocks.some(b => b.name === s)
+                                ).map(suggestion => (
+                                    <button
+                                        key={suggestion}
+                                        className="text-xs px-3 py-1.5 rounded-full border border-border hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-colors"
+                                        onClick={() => setNewBlockName(suggestion)}
+                                    >
+                                        {suggestion}
+                                    </button>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    currentDayData.blocks.length > 0 && (
+                        <Button
+                            variant="outline"
+                            className="w-full border-dashed"
+                            onClick={() => setShowNewBlockInput(true)}
+                        >
+                            <Plus className="mr-2 h-4 w-4" /> Agregar Bloque
+                        </Button>
+                    )
+                )}
             </div>
 
             {/* Exercise Selector Dialog */}
@@ -508,7 +718,7 @@ export default function RoutineBuilder({ exercises }: { exercises: Exercise[] })
                                         <Check
                                             className={cn(
                                                 "ml-auto h-4 w-4",
-                                                items.some(i => i.exercise_id === exercise.id) ? "opacity-100" : "opacity-0"
+                                                "opacity-0"
                                             )}
                                         />
                                     </CommandItem>

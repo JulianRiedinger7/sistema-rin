@@ -30,6 +30,7 @@ import { Trash2 } from 'lucide-react'
 import { deleteExpense } from './actions'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { getActivityLabel } from '@/lib/activity-types'
 
 interface Expense {
     id: string
@@ -123,15 +124,7 @@ export function ExpensesDashboard({ initialExpenses, initialPayments }: Dashboar
         }
     }
 
-    const getActivityLabel = (type: string) => {
-        switch (type) {
-            case 'gym': return 'Gimnasio'
-            case 'pilates': return 'Pilates'
-            case 'mixed': return 'Mixto'
-            case 'general': return 'General'
-            default: return type
-        }
-    }
+
 
     return (
         <div className="space-y-6">

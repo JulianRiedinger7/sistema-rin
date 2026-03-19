@@ -36,10 +36,17 @@ export default async function StudentDashboard() {
             )
         `)
 
-    if (activityType === 'mixed') {
-        query = query.in('activity_type', ['gym', 'pilates', 'mixed'])
+    // Routines are only created for 'gym'. 
+    // Students with gym access (gym, mixed) see all gym routines.
+    // Students with only pilates or trial do NOT see routines.
+    const hasGymAccess = ['gym', 'mixed'].includes(activityType)
+
+    if (hasGymAccess) {
+        query = query.eq('activity_type', 'gym')
     } else {
-        query = query.or(`activity_type.eq.${activityType},activity_type.eq.mixed`)
+        // No gym access = no routines to show (pilates, trial)
+        // Return early with empty routines
+        query = query.eq('activity_type', '__none__') // Will match nothing
     }
 
     // Only show active routines

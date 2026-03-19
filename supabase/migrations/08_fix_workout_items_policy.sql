@@ -6,17 +6,13 @@ create policy "Users can view relevant workout items" on workout_items for selec
     select 1 from workouts w 
     where w.id = workout_items.workout_id 
     and (
-      (auth.uid() = w.user_id) OR -- Direct assignment
+      (auth.uid() = w.user_id) OR
       (
-        w.activity_type is not null AND 
+        w.activity_type = 'gym' AND 
         exists (
           select 1 from profiles 
           where id = auth.uid() 
-          and (
-            (w.activity_type = profiles.activity_type) OR -- Same activity
-            (profiles.activity_type = 'mixed' AND w.activity_type in ('gym', 'pilates', 'mixed')) OR -- Mixed sees all
-            (w.activity_type = 'mixed' AND profiles.activity_type = 'mixed') -- Redundant check
-          )
+          and profiles.activity_type IN ('gym', 'mixed')
         )
       )
     )

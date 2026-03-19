@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { User, Activity, HeartPulse, FileText, Calendar, Phone, CreditCard, Scale, Ruler } from 'lucide-react'
 import { EditProfileDialog } from './edit-profile-dialog'
-import { getActivityLabel } from '@/lib/activity-types'
+import { getActivityLabel, lookupPrice, formatPrice } from '@/lib/activity-types'
 
 export default async function ProfilePage() {
     const supabase = await createClient()
@@ -45,10 +45,8 @@ export default async function ProfilePage() {
         .select('*')
 
     const getActivityPrice = (type: string) => {
-        const priceObj = prices?.find(p => p.activity_type === type)
-        const price = priceObj?.price || 0
-        return price ? `$${price.toLocaleString('es-AR')}` : '-'
-        // Fallback or loading state logic if needed
+        const total = lookupPrice(prices || [], type, profile?.pilates_weekly_classes)
+        return formatPrice(total)
     }
 
     const renderBooleanAnswer = (label: string, value: boolean, details?: string) => {
@@ -133,7 +131,7 @@ export default async function ProfilePage() {
                             <Activity className="h-4 w-4" /> Actividad
                         </p>
                         <div className="flex items-center gap-2">
-                            <p className="text-lg capitalize">{getActivityLabel(profile.activity_type)}</p>
+                            <p className="text-lg capitalize">{getActivityLabel(profile.activity_type, profile.pilates_weekly_classes)}</p>
                             <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
                                 Cuota: {getActivityPrice(profile.activity_type)}
                             </Badge>

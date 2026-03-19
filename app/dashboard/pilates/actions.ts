@@ -10,7 +10,7 @@ const BookingSchema = z.object({
 })
 
 import { Booking, PilatesConfig } from './types'
-import { differenceInMinutes } from 'date-fns'
+import { differenceInMinutes, startOfWeek, endOfWeek, format as formatDate } from 'date-fns'
 
 export async function getPilatesConfig() {
     const supabase = await createClient()
@@ -18,7 +18,7 @@ export async function getPilatesConfig() {
         .from('pilates_config')
         .select('*')
         .single()
-    // ... existing getPilatesConfig body ...
+
     if (error) {
         console.error('Error fetching pilates config detailed:', JSON.stringify(error, null, 2))
         return null
@@ -30,6 +30,34 @@ export async function getPilatesConfig() {
         afternoon_start: data.afternoon_start_hour,
         afternoon_end: data.afternoon_end_hour,
     } as PilatesConfig
+}
+
+export async function getPilatesWeekConfig(weekStart: Date) {
+    const supabase = await createClient()
+    const weekStartStr = weekStart.toISOString().split('T')[0]
+
+    const { data, error } = await supabase
+        .from('pilates_week_configs')
+        .select('*')
+        .eq('week_start', weekStartStr)
+        .maybeSingle()
+
+    if (error) {
+        console.error('Error fetching week config:', error)
+        return null
+    }
+
+    if (data) {
+        return {
+            morning_start: data.morning_start_hour,
+            morning_end: data.morning_end_hour,
+            afternoon_start: data.afternoon_start_hour,
+            afternoon_end: data.afternoon_end_hour,
+        } as PilatesConfig
+    }
+
+    // Fallback to global config
+    return getPilatesConfig()
 }
 
 
@@ -76,21 +104,51 @@ export async function searchUsers(query: string) {
 // ... existing code ...
 
 export async function bookSlot(date: Date, hour: number) {
-    // Validate Input
     const validation = BookingSchema.safeParse({ date, hour })
     if (!validation.success) return { error: 'Datos inválidos' }
 
-    const supabase = await createClient() // Just for Auth
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) return { error: 'No autorizado' }
 
-    const adminClient = createAdminClient() // For DB operations (RW and View All)
-
-    // Check capacity first
+    const adminClient = createAdminClient()
     const dateStr = date.toISOString().split('T')[0]
 
-    // Use adminClient to see ALL bookings for count, not just user's own (which RLS would hide)
+    // Check user's profile for weekly class limit
+    const { data: profile } = await adminClient
+        .from('profiles')
+        .select('activity_type, pilates_weekly_classes')
+        .eq('id', user.id)
+        .single()
+
+    if (!profile || !['pilates', 'mixed'].includes(profile.activity_type || '')) {
+        return { error: 'Tu plan no incluye Pilates' }
+    }
+
+    const weeklyLimit = profile.pilates_weekly_classes || 0
+    if (weeklyLimit === 0) {
+        return { error: 'No tienes clases de Pilates configuradas. Contacta a administración.' }
+    }
+
+    // Count bookings for this week
+    const weekStart = startOfWeek(date, { weekStartsOn: 1 })
+    const weekEnd = endOfWeek(date, { weekStartsOn: 1 })
+    const weekStartStr = formatDate(weekStart, 'yyyy-MM-dd')
+    const weekEndStr = formatDate(weekEnd, 'yyyy-MM-dd')
+
+    const { count: weeklyCount } = await adminClient
+        .from('pilates_bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('date', weekStartStr)
+        .lte('date', weekEndStr)
+
+    if ((weeklyCount || 0) >= weeklyLimit) {
+        return { error: `Ya alcanzaste tu límite de ${weeklyLimit} clase${weeklyLimit > 1 ? 's' : ''} por semana` }
+    }
+
+    // Check capacity
     const { count, error: countError } = await adminClient
         .from('pilates_bookings')
         .select('*', { count: 'exact', head: true })
@@ -112,7 +170,6 @@ export async function bookSlot(date: Date, hour: number) {
         return { error: 'No se pueden reservar turnos pasados' }
     }
 
-    // Use adminClient to INSERT (bypassing the revoked "Users can book" RLS)
     const { error } = await adminClient
         .from('pilates_bookings')
         .insert({
@@ -122,7 +179,6 @@ export async function bookSlot(date: Date, hour: number) {
         })
 
     if (error) {
-        // Handle unique constraint violation gracefully
         if (error.code === '23505') return { error: 'Ya estás anotado en este turno' }
         return { error: error.message }
     }
@@ -184,6 +240,77 @@ export async function updatePilatesConfig(config: PilatesConfig) {
     return { success: true }
 }
 
+export async function updatePilatesWeekConfig(weekStart: Date, config: PilatesConfig) {
+    const supabase = await createClient()
+    const weekStartStr = weekStart.toISOString().split('T')[0]
 
+    const { error } = await supabase
+        .from('pilates_week_configs')
+        .upsert({
+            week_start: weekStartStr,
+            morning_start_hour: config.morning_start,
+            morning_end_hour: config.morning_end,
+            afternoon_start_hour: config.afternoon_start,
+            afternoon_end_hour: config.afternoon_end
+        }, { onConflict: 'week_start' })
 
+    if (error) {
+        console.error('Error updating week config:', error)
+        return { error: error.message }
+    }
 
+    return { success: true }
+}
+
+// --- Slot Teachers ---
+
+export interface SlotTeacher {
+    date: string
+    hour: number
+    teacher_name: string
+}
+
+export async function getSlotTeachers(startDate: Date, endDate: Date): Promise<SlotTeacher[]> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('pilates_slot_teachers')
+        .select('date, hour, teacher_name')
+        .gte('date', startDate.toISOString().split('T')[0])
+        .lte('date', endDate.toISOString().split('T')[0])
+
+    if (error) {
+        console.error('Error fetching slot teachers:', error)
+        return []
+    }
+    return data as SlotTeacher[]
+}
+
+export async function setSlotTeacher(date: Date, hour: number, teacherName: string) {
+    const supabase = await createClient()
+    const dateStr = date.toISOString().split('T')[0]
+
+    if (!teacherName.trim()) {
+        // Remove teacher assignment
+        const { error } = await supabase
+            .from('pilates_slot_teachers')
+            .delete()
+            .eq('date', dateStr)
+            .eq('hour', hour)
+
+        if (error) return { error: error.message }
+        return { success: true }
+    }
+
+    const { error } = await supabase
+        .from('pilates_slot_teachers')
+        .upsert(
+            { date: dateStr, hour, teacher_name: teacherName },
+            { onConflict: 'date,hour' }
+        )
+
+    if (error) {
+        console.error('Error setting slot teacher:', error)
+        return { error: error.message }
+    }
+    return { success: true }
+}

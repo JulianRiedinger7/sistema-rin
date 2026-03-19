@@ -101,6 +101,7 @@ export function RegisterPaymentDialog({ students, pricedActivities }: { students
                                 <SelectItem value="gym">Gimnasio</SelectItem>
                                 <SelectItem value="pilates">Pilates</SelectItem>
                                 <SelectItem value="mixed">Mixto (Gym + Pilates)</SelectItem>
+                                <SelectItem value="trial">Semana de Prueba</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
